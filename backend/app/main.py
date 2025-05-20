@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import listing
+from app.routers import listing, image_upload
 
 app = FastAPI()
 
@@ -13,7 +13,7 @@ app.add_middleware(
 )
 
 app.include_router(listing.router)
-
+app.include_router(image_upload.router)
 @app.get("/")
 def root():
     return {"message": "FlashList backend is live"}
