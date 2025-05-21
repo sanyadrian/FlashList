@@ -5,6 +5,8 @@ from fastapi import Depends
 from fastapi.security import OAuth2PasswordBearer
 from app.auth.auth_handler import decode_token
 from fastapi import HTTPException
+from app.models.listing import Listing
+
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
@@ -18,14 +20,6 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
 router = APIRouter(prefix="/listing", tags=["Listing"])
 
 mock_listing_db = {}
-
-class Listing(BaseModel):
-    title: str
-    description: str
-    category: str
-    tags: list[str]
-    price: float
-    image_filenames: list[str]
 
     
 @router.post("/create")
