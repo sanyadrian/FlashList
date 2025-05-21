@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import listing, image_upload, listing_ai, pricing
+from app.routers import listing, image_upload, listing_ai, pricing, auth_router
 
 app = FastAPI()
 
@@ -16,6 +16,7 @@ app.include_router(listing.router)
 app.include_router(image_upload.router)
 app.include_router(listing_ai.router)
 app.include_router(pricing.router)
+app.include_router(auth_router.router)
 
 @app.get("/")
 def root():
