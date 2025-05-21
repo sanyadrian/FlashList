@@ -1,5 +1,7 @@
 import os
 import base64
+import json
+import re
 from dotenv import load_dotenv
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -13,6 +15,16 @@ router = APIRouter(prefix="/generate", tags=["AI Listing Generator"])
 class ListingRequest(BaseModel):
     filename: str
 
+def extract_json_from_response(text: str):
+    match = re.search(r"\{.*\}", text, re.DOTALL)
+    if not match:
+        return None
+    try:
+        return json.loads(match.group())
+    except json.JSONDecodeError:
+        return None
+    
+
 @router.post("/")
 async def generate_listing(data: ListingRequest):
     image_path = os.path.join("images", data.filename)
@@ -20,11 +32,9 @@ async def generate_listing(data: ListingRequest):
     if not os.path.exists(image_path):
         raise HTTPException(status_code=404, detail="Image not found")
 
-    # Read and encode image
     with open(image_path, "rb") as img_file:
         encoded_image = base64.b64encode(img_file.read()).decode("utf-8")
 
-    # Send to GPT-4o with vision
     response = client.chat.completions.create(
         model="gpt-4o",
         messages=[
@@ -34,11 +44,15 @@ async def generate_listing(data: ListingRequest):
                     {
                         "type": "text",
                         "text": (
-                            "You're an AI assistant helping someone sell their item online. Look at the image and write:\n"
-                            "1. A product title\n"
-                            "2. A product description\n"
-                            "3. A suggested category\n"
-                            "4. 5 relevant tags"
+                            "You're an AI assistant helping someone sell their item online. "
+                            "Look at the image and generate the following as a valid JSON object:\n\n"
+                            "{\n"
+                            "  \"title\": string,\n"
+                            "  \"description\": string,\n"
+                            "  \"category\": string,\n"
+                            "  \"tags\": [string, string, string, string, string]\n"
+                            "}\n\n"
+                            "Only return the JSON. Do not add any extra commentary or formatting."
                         )
                     },
                     {
@@ -53,6 +67,10 @@ async def generate_listing(data: ListingRequest):
         max_tokens=600
     )
 
-    return {
-        "generated": response.choices[0].message.content
-    }
+    raw = response.choices[0].message.content
+    parsed_json = extract_json_from_response(raw)
+
+    if not parsed_json:
+        raise HTTPException(status_code=500, detail="AI response was not valid JSON")
+
+    return parsed_json
