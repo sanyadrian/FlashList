@@ -1,8 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import listing, image_upload, listing_ai, pricing, auth_router
+from app.db import create_db_and_tables
 
 app = FastAPI()
+create_db_and_tables()
 
 app.add_middleware(
     CORSMiddleware,

@@ -44,3 +44,5 @@ ENV/
 .coverage
 htmlcov/
 images/
+
+*.db
