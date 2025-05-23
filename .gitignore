@@ -22,6 +22,7 @@ wheels/
 
 # Virtual Environment
 vnev/
+venv/
 env/
 ENV/
 

@@ -28,3 +28,12 @@ async def create_listing(data: Listing, user=Depends(get_current_user)):
     mock_listing_db[listing_id] = {**data.dict(), "owner": user}
     return {"id": listing_id, "message": "Listing created"}
 
+
+@router.get("/my")
+async def get_my_listings(user=Depends(get_current_user)):
+    user_listings = [
+        {"id": lid, **listing}
+        for lid, listing in mock_listing_db.items()
+        if listing.get("owner") == user
+    ]
+    return user_listings
