@@ -58,3 +58,57 @@ def get_my_listings(user=Depends(get_current_user)):
             for l in listings
         ]
 
+
+@router.get("/{listing_id}")
+def get_listing(listing_id: str):
+    with get_session() as session:
+        listing = session.get(DBListing, listing_id)
+        if not listing:
+            raise HTTPException(status_code=404, detail="Listing not found")
+        return {
+            "id": listing.id,
+            "title": listing.title,
+            "description": listing.description,
+            "category": listing.category,
+            "tags": listing.tags.split(","),
+            "image_filenames": listing.image_filenames.split(","),
+            "price": listing.price,
+            "owner": listing.owner,
+            "created_at": listing.created_at
+        }
+
+
+@router.put("/{listing_id}")
+def update_listing(listing_id: str, data: Listing, user=Depends(get_current_user)):
+    with get_session() as session:
+        listing = session.get(DBListing, listing_id)
+        if not listing:
+            raise HTTPException(status_code=404, detail="Listing not found")
+        if listing.owner != user:
+            raise HTTPException(status_code=403, detail="Not authorized")
+
+        # Update fields
+        listing.title = data.title
+        listing.description = data.description
+        listing.category = data.category
+        listing.tags = ",".join(data.tags)
+        listing.image_filenames = ",".join(data.image_filenames)
+        listing.price = data.price
+
+        session.add(listing)
+        session.commit()
+        return {"message": "Listing updated"}
+
+
+@router.delete("/{listing_id}")
+def delete_listing(listing_id: str, user=Depends(get_current_user)):
+    with get_session() as session:
+        listing = session.get(DBListing, listing_id)
+        if not listing:
+            raise HTTPException(status_code=404, detail="Listing not found")
+        if listing.owner != user:
+            raise HTTPException(status_code=403, detail="Not authorized")
+
+        session.delete(listing)
+        session.commit()
+        return {"message": "Listing deleted"}
