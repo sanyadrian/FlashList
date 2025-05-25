@@ -4,6 +4,7 @@ from app.auth.auth_handler import hash_password, verify_password, create_access_
 from app.models.auth import User, Token
 from app.db import get_session
 from app.models.user_db import User as DBUser
+from sqlmodel import select
 
 
 
@@ -22,6 +23,11 @@ def register(user: User):
         existing = session.get(DBUser, user.username)
         if existing:
             raise HTTPException(status_code=400, detail="Username already registered")
+        email_exists = session.exec(
+            select(DBUser).where(DBUser.email == user.email)
+        ).first()
+        if email_exists:
+            raise HTTPException(status_code=400, detail="Email already registered")
 
         db_user = DBUser(
             username=user.username,
