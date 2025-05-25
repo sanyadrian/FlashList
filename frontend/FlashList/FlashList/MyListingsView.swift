@@ -1,13 +1,179 @@
 import SwiftUI
 
+struct ListingItem: Identifiable, Codable {
+    let id: String
+    let title: String
+    let description: String
+    let category: String
+    let tags: [String]
+    let price: Double
+    let image_filenames: [String]
+    let owner: String
+    let created_at: String
+}
+
 struct MyListingsView: View {
+    @State private var listings: [ListingItem] = []
+    @State private var isLoading = false
+    @State private var errorMessage: String? = nil
+    
     var body: some View {
-        VStack {
-            Text("My Listings")
-                .font(.largeTitle)
-                .padding()
-            Spacer()
+        NavigationView {
+            Group {
+                if isLoading {
+                    ProgressView("Loading listings...")
+                } else if listings.isEmpty {
+                    VStack(spacing: 16) {
+                        Image(systemName: "shippingbox")
+                            .font(.system(size: 60))
+                            .foregroundColor(.gray)
+                        Text("No listings yet")
+                            .font(.title2)
+                            .foregroundColor(.gray)
+                    }
+                } else {
+                    List(listings) { listing in
+                        NavigationLink(destination: ListingDetailView(listing: listing)) {
+                            ListingRowView(listing: listing)
+                        }
+                    }
+                }
+            }
+            .navigationTitle("My Listings")
+            .refreshable {
+                await fetchListings()
+            }
         }
+        .alert("Error", isPresented: .constant(errorMessage != nil)) {
+            Button("OK") {
+                errorMessage = nil
+            }
+        } message: {
+            Text(errorMessage ?? "")
+        }
+        .task {
+            await fetchListings()
+        }
+    }
+    
+    private func fetchListings() async {
+        isLoading = true
+        defer { isLoading = false }
+        
+        guard let url = URL(string: "http://localhost:8000/listing/my") else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse,
+                  httpResponse.statusCode == 200 else {
+                throw URLError(.badServerResponse)
+            }
+            
+            listings = try JSONDecoder().decode([ListingItem].self, from: data)
+        } catch {
+            errorMessage = "Failed to load listings: \(error.localizedDescription)"
+        }
+    }
+}
+
+struct ListingRowView: View {
+    let listing: ListingItem
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            if let firstImage = listing.image_filenames.first,
+               let url = URL(string: "http://localhost:8000/images/\(firstImage)") {
+                AsyncImage(url: url) { image in
+                    image
+                        .resizable()
+                        .scaledToFill()
+                } placeholder: {
+                    Color.gray
+                }
+                .frame(width: 60, height: 60)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(listing.title)
+                    .font(.headline)
+                Text(listing.category)
+                    .font(.subheadline)
+                    .foregroundColor(.gray)
+                Text("$\(String(format: "%.2f", listing.price))")
+                    .font(.subheadline)
+                    .foregroundColor(.blue)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+struct ListingDetailView: View {
+    let listing: ListingItem
+    
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                // Image carousel
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(listing.image_filenames, id: \.self) { filename in
+                            if let url = URL(string: "http://localhost:8000/images/\(filename)") {
+                                AsyncImage(url: url) { image in
+                                    image
+                                        .resizable()
+                                        .scaledToFill()
+                                } placeholder: {
+                                    Color.gray
+                                }
+                                .frame(width: 300, height: 300)
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                            }
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+                
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(listing.title)
+                        .font(.title)
+                        .bold()
+                    
+                    Text("$\(String(format: "%.2f", listing.price))")
+                        .font(.title2)
+                        .foregroundColor(.blue)
+                    
+                    Text(listing.category)
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                    
+                    Text(listing.description)
+                        .font(.body)
+                    
+                    // Tags
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack {
+                            ForEach(listing.tags, id: \.self) { tag in
+                                Text(tag)
+                                    .font(.caption)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(Color.blue.opacity(0.1))
+                                    .foregroundColor(.blue)
+                                    .clipShape(Capsule())
+                            }
+                        }
+                    }
+                }
+                .padding()
+            }
+        }
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 

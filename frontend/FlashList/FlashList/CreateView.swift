@@ -2,6 +2,16 @@ import SwiftUI
 import AVFoundation
 import PhotosUI
 
+// Listing model
+struct Listing: Codable {
+    let title: String
+    let description: String
+    let category: String
+    let tags: [String]
+    var price: Double?
+    var image_filenames: [String]?
+}
+
 struct CameraPreview: UIViewControllerRepresentable {
     class CameraViewController: UIViewController, AVCapturePhotoCaptureDelegate {
         var previewLayer: AVCaptureVideoPreviewLayer?
@@ -83,7 +93,56 @@ struct CreateView: View {
     @State private var isGenerating = false
     @State private var errorMessage: String? = nil
     
+    // New state variables for listing creation
+    @State private var title: String = ""
+    @State private var description: String = ""
+    @State private var category: String = ""
+    @State private var tags: String = ""
+    @State private var price: String = ""
+    @State private var showListingForm = false
+    @State private var isUploading = false
+    @State private var showSuccessAlert = false
+    @State private var navigateToMyListings = false
+    
     var body: some View {
+        NavigationView {
+            ZStack {
+                if showListingForm {
+                    listingFormView
+                } else {
+                    cameraView
+                }
+                
+                if isGenerating || isUploading {
+                    Color.black.opacity(0.3).ignoresSafeArea()
+                    ProgressView(isGenerating ? "Generating..." : "Uploading...")
+                        .foregroundColor(.white)
+                        .padding()
+                        .background(Color.black.opacity(0.7))
+                        .cornerRadius(10)
+                }
+            }
+            .alert("Error", isPresented: .constant(errorMessage != nil)) {
+                Button("OK") {
+                    errorMessage = nil
+                }
+            } message: {
+                Text(errorMessage ?? "")
+            }
+            .alert("Success", isPresented: $showSuccessAlert) {
+                Button("View My Listings") {
+                    navigateToMyListings = true
+                }
+            } message: {
+                Text("Your listing has been created successfully!")
+            }
+            .navigationDestination(isPresented: $navigateToMyListings) {
+                MyListingsView()
+            }
+        }
+    }
+    
+    private var cameraView: some View {
         ZStack {
             CameraPreview(onPhotoCapture: { img in
                 addPhoto(img)
@@ -93,7 +152,13 @@ struct CreateView: View {
             VStack {
                 // Top bar
                 HStack {
-                    Button(action: { /* Close action */ }) {
+                    Button(action: {
+                        if !photos.isEmpty {
+                            photos.removeAll()
+                            photoFilenames.removeAll()
+                            selectedForGeneration = nil
+                        }
+                    }) {
                         Image(systemName: "xmark")
                             .font(.system(size: 24, weight: .bold))
                             .foregroundColor(.black)
@@ -112,20 +177,39 @@ struct CreateView: View {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 12) {
                             ForEach(photos.indices, id: \.self) { idx in
-                                Image(uiImage: photos[idx])
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(width: 60, height: 60)
-                                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 10)
-                                            .stroke(idx == selectedForGeneration ? Color.blue : Color.clear, lineWidth: 3)
-                                    )
-                                    .onTapGesture {
-                                        if photos.count > 1 {
-                                            selectedForGeneration = idx
+                                ZStack(alignment: .topTrailing) {
+                                    Image(uiImage: photos[idx])
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(width: 60, height: 60)
+                                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 10)
+                                                .stroke(idx == selectedForGeneration ? Color.blue : Color.clear, lineWidth: 3)
+                                        )
+                                        .onTapGesture {
+                                            if photos.count > 1 {
+                                                selectedForGeneration = idx
+                                            }
                                         }
+                                    
+                                    // Delete button
+                                    Button(action: {
+                                        photos.remove(at: idx)
+                                        photoFilenames.remove(at: idx)
+                                        if selectedForGeneration == idx {
+                                            selectedForGeneration = nil
+                                        } else if let selected = selectedForGeneration, selected > idx {
+                                            selectedForGeneration = selected - 1
+                                        }
+                                    }) {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .foregroundColor(.white)
+                                            .background(Color.black.opacity(0.5))
+                                            .clipShape(Circle())
                                     }
+                                    .offset(x: 6, y: -6)
+                                }
                             }
                         }
                         .padding(.horizontal, 16)
@@ -195,24 +279,6 @@ struct CreateView: View {
                 }
                 .padding(.bottom, 36)
             }
-            if isGenerating {
-                Color.black.opacity(0.3).ignoresSafeArea()
-                ProgressView("Generating...")
-                    .padding()
-                    .background(Color.white)
-                    .cornerRadius(12)
-            }
-            if let errorMessage = errorMessage {
-                VStack {
-                    Spacer()
-                    Text(errorMessage)
-                        .foregroundColor(.red)
-                        .padding()
-                        .background(Color.white)
-                        .cornerRadius(12)
-                    Spacer()
-                }
-            }
         }
         .onChange(of: selectedItems) { newItems in
             for item in newItems {
@@ -228,6 +294,167 @@ struct CreateView: View {
             ActionSheet(title: Text("Select photo for generation"), buttons: photoSelectionButtons())
         }
         .background(CameraPreviewGetter(vc: $cameraVC))
+    }
+    
+    private var listingFormView: some View {
+        NavigationView {
+            Form {
+                Section(header: Text("Photos")) {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 12) {
+                            ForEach(photos.indices, id: \.self) { idx in
+                                ZStack(alignment: .topTrailing) {
+                                    Image(uiImage: photos[idx])
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(width: 100, height: 100)
+                                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                                    
+                                    // Delete button
+                                    Button(action: {
+                                        photos.remove(at: idx)
+                                        photoFilenames.remove(at: idx)
+                                    }) {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .foregroundColor(.white)
+                                            .background(Color.black.opacity(0.5))
+                                            .clipShape(Circle())
+                                    }
+                                    .offset(x: 6, y: -6)
+                                }
+                            }
+                        }
+                        .padding(.vertical, 8)
+                    }
+                }
+                
+                Section(header: Text("Listing Details")) {
+                    TextField("Title", text: $title)
+                    TextField("Category", text: $category)
+                    TextField("Price", text: $price)
+                        .keyboardType(.decimalPad)
+                    TextField("Tags (comma separated)", text: $tags)
+                    TextEditor(text: $description)
+                        .frame(height: 100)
+                }
+                
+                Section {
+                    Button(action: createListing) {
+                        Text("Create Listing")
+                            .frame(maxWidth: .infinity)
+                            .foregroundColor(.white)
+                    }
+                    .listRowBackground(Color.blue)
+                    .disabled(isUploading || title.isEmpty || category.isEmpty || price.isEmpty)
+                }
+            }
+            .navigationTitle("Create Listing")
+            .navigationBarItems(leading: Button("Cancel") {
+                showListingForm = false
+            })
+        }
+    }
+    
+    private func createListing() {
+        guard let priceDouble = Double(price) else {
+            errorMessage = "Please enter a valid price"
+            return
+        }
+        
+        isUploading = true
+        
+        let listing = Listing(
+            title: title,
+            description: description,
+            category: category,
+            tags: tags.split(separator: ",").map { String($0.trimmingCharacters(in: .whitespaces)) },
+            price: priceDouble,
+            image_filenames: photoFilenames
+        )
+        
+        guard let url = URL(string: "http://localhost:8000/listing/create") else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        do {
+            request.httpBody = try JSONEncoder().encode(listing)
+        } catch {
+            errorMessage = "Failed to encode listing data"
+            isUploading = false
+            return
+        }
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            DispatchQueue.main.async {
+                isUploading = false
+                
+                if let error = error {
+                    self.errorMessage = error.localizedDescription
+                    return
+                }
+                
+                if let httpResponse = response as? HTTPURLResponse,
+                   httpResponse.statusCode != 200 {
+                    self.errorMessage = "Failed to create listing"
+                    return
+                }
+                
+                showSuccessAlert = true
+            }
+        }.resume()
+    }
+    
+    private func resetForm() {
+        title = ""
+        description = ""
+        category = ""
+        tags = ""
+        price = ""
+        photos = []
+        photoFilenames = []
+        showListingForm = false
+    }
+    
+    private func generateListing(with idx: Int) {
+        isGenerating = true
+        errorMessage = nil
+        
+        guard let url = URL(string: "http://localhost:8000/generate/") else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let body = ["filename": photoFilenames[idx]]
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error = error {
+                DispatchQueue.main.async {
+                    self.errorMessage = error.localizedDescription
+                    self.isGenerating = false
+                }
+                return
+            }
+            
+            guard let data = data,
+                  let generatedListing = try? JSONDecoder().decode(Listing.self, from: data) else {
+                DispatchQueue.main.async {
+                    self.errorMessage = "Failed to decode generated listing"
+                    self.isGenerating = false
+                }
+                return
+            }
+            
+            DispatchQueue.main.async {
+                self.title = generatedListing.title
+                self.description = generatedListing.description
+                self.category = generatedListing.category
+                self.tags = generatedListing.tags.joined(separator: ", ")
+                self.isGenerating = false
+                self.showListingForm = true
+            }
+        }.resume()
     }
     
     func addPhoto(_ img: UIImage) {
@@ -260,41 +487,6 @@ struct CreateView: View {
             DispatchQueue.main.async {
                 self.photoFilenames.append(filename)
             }
-        }.resume()
-    }
-    
-    func generateListing(with idx: Int) {
-        isGenerating = true
-        errorMessage = nil
-        let selectedFilename = photoFilenames[safe: idx] ?? ""
-        let allFilenames = photoFilenames
-        // Call /generate/ and then /listing/create/
-        guard let url = URL(string: "http://localhost:8000/generate/") else { return }
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        let body: [String: Any] = ["photo": selectedFilename]
-        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
-        URLSession.shared.dataTask(with: request) { data, response, error in
-            if let error = error {
-                DispatchQueue.main.async {
-                    self.errorMessage = error.localizedDescription
-                    self.isGenerating = false
-                }
-                return
-            }
-            // After generation, call /listing/create/
-            guard let url2 = URL(string: "http://localhost:8000/listing/create/") else { return }
-            var request2 = URLRequest(url: url2)
-            request2.httpMethod = "POST"
-            request2.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            let body2: [String: Any] = ["photos": allFilenames]
-            request2.httpBody = try? JSONSerialization.data(withJSONObject: body2)
-            URLSession.shared.dataTask(with: request2) { data, response, error in
-                DispatchQueue.main.async {
-                    self.isGenerating = false
-                }
-            }.resume()
         }.resume()
     }
     
