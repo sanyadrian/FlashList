@@ -299,7 +299,7 @@ struct CreateView: View {
     private var listingFormView: some View {
         NavigationView {
             Form {
-                Section(header: Text("Photos")) {
+                Section(header: Text("PHOTOS")) {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 12) {
                             ForEach(photos.indices, id: \.self) { idx in
@@ -324,18 +324,44 @@ struct CreateView: View {
                                 }
                             }
                         }
-                        .padding(.vertical, 8)
                     }
+                    .padding(.vertical, 8)
                 }
                 
-                Section(header: Text("Listing Details")) {
-                    TextField("Title", text: $title)
-                    TextField("Category", text: $category)
-                    TextField("Price", text: $price)
-                        .keyboardType(.decimalPad)
-                    TextField("Tags (comma separated)", text: $tags)
-                    TextEditor(text: $description)
-                        .frame(height: 100)
+                Section(header: Text("LISTING DETAILS")) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Title")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                        TextField("Enter title", text: $title)
+                    }
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Category")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                        TextField("Enter category", text: $category)
+                    }
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Tags (comma separated)")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                        TextField("e.g. electronics, phone, used", text: $tags)
+                    }
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Description")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                        TextEditor(text: $description)
+                            .frame(height: 100)
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.gray.opacity(0.2)))
+                    }
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Price (required)")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                        TextField("Enter price", text: $price)
+                            .keyboardType(.decimalPad)
+                    }
                 }
                 
                 Section {
