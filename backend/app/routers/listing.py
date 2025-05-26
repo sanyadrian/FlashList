@@ -57,7 +57,8 @@ def get_my_listings(user=Depends(get_current_user)):
                 "image_filenames": l.image_filenames.split(","),
                 "price": l.price,
                 "created_at": str(l.created_at),
-                "owner": l.owner
+                "owner": l.owner,
+                "marketplaces": l.marketplaces.split(",")
             }
             for l in listings
         ]
@@ -78,7 +79,8 @@ def get_listing(listing_id: str):
             "image_filenames": listing.image_filenames.split(","),
             "price": listing.price,
             "owner": listing.owner,
-            "created_at": listing.created_at
+            "created_at": listing.created_at,
+            "marketplaces": listing.marketplaces.split(",")
         }
 
 
@@ -98,6 +100,7 @@ def update_listing(listing_id: str, data: Listing, user=Depends(get_current_user
         listing.tags = ",".join(data.tags)
         listing.image_filenames = ",".join(data.image_filenames)
         listing.price = data.price
+        listing.marketplaces = ",".join(data.marketplaces)
 
         session.add(listing)
         session.commit()

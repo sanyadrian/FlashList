@@ -10,6 +10,7 @@ struct ListingItem: Identifiable, Codable {
     let image_filenames: [String]
     let owner: String
     let created_at: String
+    let marketplaces: [String]
 }
 
 struct MyListingsView: View {
@@ -168,6 +169,31 @@ struct ListingDetailView: View {
                                     .background(Color.blue.opacity(0.1))
                                     .foregroundColor(.blue)
                                     .clipShape(Capsule())
+                            }
+                        }
+                    }
+                    
+                    // Marketplaces
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Selected Marketplaces")
+                            .font(.headline)
+                            .padding(.top, 8)
+                        
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack {
+                                ForEach(listing.marketplaces, id: \.self) { marketplace in
+                                    HStack {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundColor(.green)
+                                        Text(marketplace)
+                                    }
+                                    .font(.subheadline)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(Color.green.opacity(0.1))
+                                    .foregroundColor(.green)
+                                    .clipShape(Capsule())
+                                }
                             }
                         }
                     }
