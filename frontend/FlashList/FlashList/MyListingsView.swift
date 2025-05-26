@@ -34,7 +34,16 @@ struct MyListingsView: View {
                     }
                 } else {
                     List(listings) { listing in
-                        NavigationLink(destination: ListingDetailView(listing: listing)) {
+                        NavigationLink(
+                            destination: ListingDetailView(
+                                listing: listing,
+                                onDelete: {
+                                    if let idx = listings.firstIndex(where: { $0.id == listing.id }) {
+                                        listings.remove(at: idx)
+                                    }
+                                }
+                            )
+                        ) {
                             ListingRowView(listing: listing)
                         }
                     }
@@ -117,8 +126,14 @@ struct ListingRowView: View {
 }
 
 struct ListingDetailView: View {
-    let listing: ListingItem
-    
+    @Environment(\.presentationMode) var presentationMode
+    @State var listing: ListingItem
+    var onDelete: (() -> Void)? = nil
+    @State private var isEditing = false
+    @State private var showDeleteAlert = false
+    @State private var isDeleting = false
+    @State private var errorMessage: String?
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
@@ -202,6 +217,62 @@ struct ListingDetailView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItemGroup(placement: .navigationBarTrailing) {
+                Button(action: { isEditing = true }) {
+                    Text("Edit")
+                        .font(.headline)
+                        .foregroundColor(.blue)
+                }
+                Button(role: .destructive) {
+                    showDeleteAlert = true
+                } label: {
+                    Image(systemName: "trash")
+                }
+                .disabled(isDeleting)
+            }
+        }
+        .sheet(isPresented: $isEditing) {
+            EditListingView(listing: listing) { updated in
+                self.listing = updated
+            }
+        }
+        .alert("Delete Listing?", isPresented: $showDeleteAlert) {
+            Button("Delete", role: .destructive) { deleteListing() }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Are you sure you want to delete this listing? This action cannot be undone.")
+        }
+        .alert("Error", isPresented: .constant(errorMessage != nil)) {
+            Button("OK") { errorMessage = nil }
+        } message: {
+            Text(errorMessage ?? "")
+        }
+    }
+
+    func deleteListing() {
+        isDeleting = true
+        guard let url = URL(string: "http://localhost:8000/listing/\(listing.id)") else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        if let token = UserDefaults.standard.string(forKey: "access_token") {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            DispatchQueue.main.async {
+                isDeleting = false
+                if let error = error {
+                    self.errorMessage = error.localizedDescription
+                    return
+                }
+                if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
+                    onDelete?()
+                    presentationMode.wrappedValue.dismiss()
+                } else {
+                    self.errorMessage = "Failed to delete listing."
+                }
+            }
+        }.resume()
     }
 }
 
