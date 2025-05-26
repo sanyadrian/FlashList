@@ -10,6 +10,18 @@ struct Listing: Codable {
     let tags: [String]
     var price: Double?
     var image_filenames: [String]?
+    var marketplaces: [String]?
+}
+
+// Helper struct for draft listing (not yet sent to backend)
+struct ListingDraft {
+    var title: String
+    var description: String
+    var category: String
+    var tags: String
+    var price: String
+    var photoFilenames: [String]
+    var photos: [UIImage]
 }
 
 struct CameraPreview: UIViewControllerRepresentable {
@@ -102,10 +114,11 @@ struct CreateView: View {
     @State private var showListingForm = false
     @State private var isUploading = false
     @State private var showSuccessAlert = false
-    @State private var navigateToMyListings = false
+    @State private var navigateToSelectMarketplaces = false
+    @State private var draft: ListingDraft? = nil
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
                 if showListingForm {
                     listingFormView
@@ -130,14 +143,16 @@ struct CreateView: View {
                 Text(errorMessage ?? "")
             }
             .alert("Success", isPresented: $showSuccessAlert) {
-                Button("View My Listings") {
-                    navigateToMyListings = true
+                Button("Select Marketplaces") {
+                    navigateToSelectMarketplaces = true
                 }
             } message: {
                 Text("Your listing has been created successfully!")
             }
-            .navigationDestination(isPresented: $navigateToMyListings) {
-                MyListingsView()
+            .navigationDestination(isPresented: $navigateToSelectMarketplaces) {
+                if let draft = draft {
+                    SelectMarketplacesView(draft: draft)
+                }
             }
         }
     }
@@ -215,6 +230,11 @@ struct CreateView: View {
                         .padding(.horizontal, 16)
                     }
                     .padding(.top, 12)
+                } else {
+                    Spacer()
+                    Text("Take a photo or select from library")
+                        .foregroundColor(.gray)
+                        .padding(.top, 40)
                 }
                 
                 Spacer()
@@ -240,7 +260,7 @@ struct CreateView: View {
                     .padding(.bottom, 24)
                 }
                 
-                // Three circular buttons at the bottom
+                // Three circular buttons at the bottom (always visible)
                 HStack(spacing: 36) {
                     PhotosPicker(selection: $selectedItems, maxSelectionCount: 5, matching: .images) {
                         Circle()
@@ -297,88 +317,98 @@ struct CreateView: View {
     }
     
     private var listingFormView: some View {
-        NavigationView {
-            Form {
-                Section(header: Text("PHOTOS")) {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 12) {
-                            ForEach(photos.indices, id: \.self) { idx in
-                                ZStack(alignment: .topTrailing) {
-                                    Image(uiImage: photos[idx])
-                                        .resizable()
-                                        .scaledToFill()
-                                        .frame(width: 100, height: 100)
-                                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                                    
-                                    // Delete button
-                                    Button(action: {
-                                        photos.remove(at: idx)
-                                        photoFilenames.remove(at: idx)
-                                    }) {
-                                        Image(systemName: "xmark.circle.fill")
-                                            .foregroundColor(.white)
-                                            .background(Color.black.opacity(0.5))
-                                            .clipShape(Circle())
-                                    }
-                                    .offset(x: 6, y: -6)
+        Form {
+            Section(header: Text("PHOTOS")) {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(photos.indices, id: \.self) { idx in
+                            ZStack(alignment: .topTrailing) {
+                                Image(uiImage: photos[idx])
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(width: 100, height: 100)
+                                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                                
+                                // Delete button
+                                Button(action: {
+                                    photos.remove(at: idx)
+                                    photoFilenames.remove(at: idx)
+                                }) {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .foregroundColor(.white)
+                                        .background(Color.black.opacity(0.5))
+                                        .clipShape(Circle())
                                 }
+                                .offset(x: 6, y: -6)
                             }
                         }
                     }
-                    .padding(.vertical, 8)
                 }
-                
-                Section(header: Text("LISTING DETAILS")) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Title")
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                        TextField("Enter title", text: $title)
-                    }
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Category")
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                        TextField("Enter category", text: $category)
-                    }
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Tags (comma separated)")
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                        TextField("e.g. electronics, phone, used", text: $tags)
-                    }
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Description")
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                        TextEditor(text: $description)
-                            .frame(height: 100)
-                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.gray.opacity(0.2)))
-                    }
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Price (required)")
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                        TextField("Enter price", text: $price)
-                            .keyboardType(.decimalPad)
-                    }
+                .padding(.vertical, 8)
+            }
+            
+            Section(header: Text("LISTING DETAILS")) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Title")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                    TextField("Enter title", text: $title)
                 }
-                
-                Section {
-                    Button(action: createListing) {
-                        Text("Create Listing")
-                            .frame(maxWidth: .infinity)
-                            .foregroundColor(.white)
-                    }
-                    .listRowBackground(Color.blue)
-                    .disabled(isUploading || title.isEmpty || category.isEmpty || price.isEmpty)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Category")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                    TextField("Enter category", text: $category)
+                }
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Tags (comma separated)")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                    TextField("e.g. electronics, phone, used", text: $tags)
+                }
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Description")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                    TextEditor(text: $description)
+                        .frame(height: 100)
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.gray.opacity(0.2)))
+                }
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Price (required)")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                    TextField("Enter price", text: $price)
+                        .keyboardType(.decimalPad)
                 }
             }
-            .navigationTitle("Create Listing")
-            .navigationBarItems(leading: Button("Cancel") {
-                showListingForm = false
-            })
+            
+            Section {
+                Button(action: {
+                    print("Create Listing tapped")
+                    draft = ListingDraft(
+                        title: title,
+                        description: description,
+                        category: category,
+                        tags: tags,
+                        price: price,
+                        photoFilenames: photoFilenames,
+                        photos: photos
+                    )
+                    navigateToSelectMarketplaces = true
+                }) {
+                    Text("Create Listing")
+                        .frame(maxWidth: .infinity)
+                        .foregroundColor(.white)
+                }
+                .listRowBackground(Color.blue)
+                .disabled(isUploading || title.isEmpty || category.isEmpty || price.isEmpty)
+            }
         }
+        .navigationTitle("Create Listing")
+        .navigationBarItems(leading: Button("Cancel") {
+            showListingForm = false
+        })
     }
     
     private func createListing() {
@@ -386,9 +416,7 @@ struct CreateView: View {
             errorMessage = "Please enter a valid price"
             return
         }
-        
         isUploading = true
-        
         let listing = Listing(
             title: title,
             description: description,
@@ -397,12 +425,13 @@ struct CreateView: View {
             price: priceDouble,
             image_filenames: photoFilenames
         )
-        
         guard let url = URL(string: "http://localhost:8000/listing/create") else { return }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
+        if let token = UserDefaults.standard.string(forKey: "authToken") {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
         do {
             request.httpBody = try JSONEncoder().encode(listing)
         } catch {
@@ -410,22 +439,18 @@ struct CreateView: View {
             isUploading = false
             return
         }
-        
         URLSession.shared.dataTask(with: request) { data, response, error in
             DispatchQueue.main.async {
                 isUploading = false
-                
                 if let error = error {
                     self.errorMessage = error.localizedDescription
                     return
                 }
-                
                 if let httpResponse = response as? HTTPURLResponse,
                    httpResponse.statusCode != 200 {
                     self.errorMessage = "Failed to create listing"
                     return
                 }
-                
                 showSuccessAlert = true
             }
         }.resume()

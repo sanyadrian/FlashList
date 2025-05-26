@@ -10,5 +10,6 @@ class Listing(SQLModel, table=True):
     category: str
     tags: str 
     image_filenames: str
+    marketplaces: str
     price: float
     created_at: datetime = Field(default_factory=datetime.utcnow)

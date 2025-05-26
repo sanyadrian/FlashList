@@ -8,3 +8,4 @@ class Listing(BaseModel):
     tags: List[str]
     price: float
     image_filenames: List[str]
+    marketplaces: List[str]
