@@ -24,6 +24,8 @@ router = APIRouter(prefix="/listing", tags=["Listing"])
 
 @router.post("/create")
 def create_listing(data: Listing, user=Depends(get_current_user)):
+    if not data.marketplaces or len(data.marketplaces) == 0:
+        raise HTTPException(status_code=400, detail="At least one marketplace must be selected")
     with get_session() as session:
         listing = DBListing(
             id=str(uuid.uuid4()),
@@ -33,7 +35,8 @@ def create_listing(data: Listing, user=Depends(get_current_user)):
             category=data.category,
             tags=",".join(data.tags),
             image_filenames=",".join(data.image_filenames),
-            price=data.price
+            price=data.price,
+            marketplaces=",".join(data.marketplaces)
         )
         session.add(listing)
         session.commit()
@@ -53,7 +56,8 @@ def get_my_listings(user=Depends(get_current_user)):
                 "tags": l.tags.split(","),
                 "image_filenames": l.image_filenames.split(","),
                 "price": l.price,
-                "created_at": l.created_at
+                "created_at": str(l.created_at),
+                "owner": l.owner
             }
             for l in listings
         ]

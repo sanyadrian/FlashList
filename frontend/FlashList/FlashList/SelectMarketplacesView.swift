@@ -31,21 +31,6 @@ struct SelectMarketplacesView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // HStack {
-            //     Button(action: { /* Back action */ }) {
-            //         Image(systemName: "chevron.left")
-            //             .font(.system(size: 20, weight: .bold))
-            //             .foregroundColor(.black)
-            //     }
-            //     Spacer()
-            //     Text("Marketplaces")
-            //         .font(.headline)
-            //         .padding(.trailing, 24)
-            //     Spacer().frame(width: 24)
-            // }
-            // .padding(.top, 16)
-            // .padding(.horizontal)
-            
             Text("Select marketplaces")
                 .font(.title3.bold())
                 .padding(.top, 24)
@@ -108,11 +93,8 @@ struct SelectMarketplacesView: View {
         } message: {
             Text(errorMessage ?? "")
         }
-        .alert("Success", isPresented: $showSuccess) {
-            Button("Go to My Listings") { navigateToMyListings = true }
-        } message: {
-            Text("Your listing has been created!")
-        }
+        .navigationTitle("Marketplaces")
+        .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(isPresented: $navigateToMyListings) {
             MyListingsView()
         }
@@ -140,7 +122,7 @@ struct SelectMarketplacesView: View {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        if let token = UserDefaults.standard.string(forKey: "authToken") {
+        if let token = UserDefaults.standard.string(forKey: "access_token") {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
         do {
@@ -162,7 +144,7 @@ struct SelectMarketplacesView: View {
                     self.errorMessage = "Failed to create listing"
                     return
                 }
-                showSuccess = true
+                navigateToMyListings = true
             }
         }.resume()
     }
