@@ -109,6 +109,11 @@ struct RegisterView: View {
             isLoading = false
             return
         }
+        guard password.count >= 8 else {
+            errorMessage = "Password must be at least 8 symbols long."
+            isLoading = false
+            return
+        }
         guard let url = URL(string: "http://localhost:8000/auth/register") else {
             errorMessage = "Invalid URL"
             isLoading = false
