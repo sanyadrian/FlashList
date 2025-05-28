@@ -22,7 +22,7 @@ struct RegisterView: View {
             
             // Form
             VStack(spacing: 16) {
-                TextField("Full Name", text: $fullName)
+                TextField("Username", text: $fullName)
                     .padding()
                     .background(Color(.systemGray6))
                     .cornerRadius(12)
@@ -123,7 +123,7 @@ struct RegisterView: View {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let body: [String: Any] = [
-            "username": fullName,
+            "username": fullName.lowercased(),
             "email": email,
             "password": password
         ]
@@ -141,6 +141,9 @@ struct RegisterView: View {
                 }
                 if httpResponse.statusCode == 200 {
                     isSuccess = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        presentationMode.wrappedValue.dismiss()
+                    }
                 } else if let data = data, let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any], let detail = json["detail"] as? String {
                     if detail.contains("Username already registered") {
                         errorMessage = "This username is already taken."

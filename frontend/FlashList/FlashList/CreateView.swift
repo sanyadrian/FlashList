@@ -154,6 +154,9 @@ struct CreateView: View {
                     SelectMarketplacesView(draft: draft)
                 }
             }
+            .onAppear {
+                resetForm()
+            }
         }
     }
     

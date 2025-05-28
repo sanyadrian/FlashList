@@ -166,7 +166,7 @@ struct LoginView: View {
         }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        let bodyString = "username=\(username)&password=\(password)"
+        let bodyString = "username=\(username.lowercased())&password=\(password)"
         request.httpBody = bodyString.data(using: .utf8)
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         URLSession.shared.dataTask(with: request) { data, response, error in
