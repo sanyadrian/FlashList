@@ -1,4 +1,5 @@
 import SwiftUI
+import SafariServices
 
 struct ListingItem: Identifiable, Codable {
     let id: String
@@ -158,6 +159,33 @@ struct MarketplaceStatusView: View {
     }
 }
 
+struct SafariView: UIViewControllerRepresentable {
+    let url: URL
+    
+    func makeUIViewController(context: UIViewControllerRepresentableContext<SafariView>) -> SFSafariViewController {
+        return SFSafariViewController(url: url)
+    }
+    
+    func updateUIViewController(_ uiViewController: SFSafariViewController, context: UIViewControllerRepresentableContext<SafariView>) {
+    }
+}
+
+struct FacebookShareButton: View {
+    var listingId: String
+    @State private var showingSafari = false
+    
+    var body: some View {
+        Button(action: {
+            showingSafari = true
+        }) {
+            Label("Share on Facebook", systemImage: "square.and.arrow.up")
+        }
+        .sheet(isPresented: $showingSafari) {
+            SafariView(url: URL(string: "https://www.facebook.com/sharer/sharer.php?u=https://flashlist.app/listing/\(listingId)")!)
+        }
+    }
+}
+
 struct ListingDetailView: View {
     @Environment(\.presentationMode) var presentationMode
     @State var listing: ListingItem
@@ -259,7 +287,18 @@ struct ListingDetailView: View {
                             status: listing.marketplace_status[marketplace] ?? "pending"
                         )
                     }
+                    
+                    if listing.marketplaces.contains("Facebook Marketplace") {
+                        FacebookShareButton(listingId: listing.id)
+                            .padding()
+                            .frame(maxWidth: .infinity)
+                            .background(Color.blue.opacity(0.1))
+                            .foregroundColor(.blue)
+                            .cornerRadius(10)
+                            .padding(.top, 16)
+                    }
                 }
+                .padding()
             }
         }
         .navigationBarTitleDisplayMode(.inline)
