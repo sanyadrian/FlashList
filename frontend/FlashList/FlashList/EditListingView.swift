@@ -113,7 +113,8 @@ struct EditListingView: View {
             image_filenames: listing.image_filenames,
             owner: listing.owner,
             created_at: listing.created_at,
-            marketplaces: Array(selectedMarketplaces)
+            marketplaces: Array(selectedMarketplaces),
+            marketplace_status: listing.marketplace_status
         )
         guard let url = URL(string: "http://localhost:8000/listing/\(listing.id)") else { return }
         var request = URLRequest(url: url)

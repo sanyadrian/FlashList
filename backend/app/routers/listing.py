@@ -9,6 +9,7 @@ from app.db import get_session
 from app.models.listing_db import Listing as DBListing
 from sqlmodel import Session
 import uuid
+import json
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
@@ -26,6 +27,10 @@ router = APIRouter(prefix="/listing", tags=["Listing"])
 def create_listing(data: Listing, user=Depends(get_current_user)):
     if not data.marketplaces or len(data.marketplaces) == 0:
         raise HTTPException(status_code=400, detail="At least one marketplace must be selected")
+    
+    # Initialize marketplace statuses
+    marketplace_status = {marketplace: "pending" for marketplace in data.marketplaces}
+    
     with get_session() as session:
         listing = DBListing(
             id=str(uuid.uuid4()),
@@ -36,7 +41,8 @@ def create_listing(data: Listing, user=Depends(get_current_user)):
             tags=",".join(data.tags),
             image_filenames=",".join(data.image_filenames),
             price=data.price,
-            marketplaces=",".join(data.marketplaces)
+            marketplaces=",".join(data.marketplaces),
+            marketplace_status=json.dumps(marketplace_status)
         )
         session.add(listing)
         session.commit()
@@ -58,7 +64,8 @@ def get_my_listings(user=Depends(get_current_user)):
                 "price": l.price,
                 "created_at": str(l.created_at),
                 "owner": l.owner,
-                "marketplaces": l.marketplaces.split(",")
+                "marketplaces": l.marketplaces.split(","),
+                "marketplace_status": json.loads(l.marketplace_status)
             }
             for l in listings
         ]
@@ -80,7 +87,8 @@ def get_listing(listing_id: str):
             "price": listing.price,
             "owner": listing.owner,
             "created_at": listing.created_at,
-            "marketplaces": listing.marketplaces.split(",")
+            "marketplaces": listing.marketplaces.split(","),
+            "marketplace_status": json.loads(listing.marketplace_status)
         }
 
 

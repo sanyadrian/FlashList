@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List
+from typing import List, Dict
 
 class Listing(BaseModel):
     title: str
@@ -9,3 +9,4 @@ class Listing(BaseModel):
     price: float
     image_filenames: List[str]
     marketplaces: List[str]
+    marketplace_status: Dict[str, str] = {}

@@ -11,5 +11,6 @@ class Listing(SQLModel, table=True):
     tags: str 
     image_filenames: str
     marketplaces: str
+    marketplace_status: str = Field(default="{}")  # JSON string to store status per marketplace
     price: float
     created_at: datetime = Field(default_factory=datetime.utcnow)

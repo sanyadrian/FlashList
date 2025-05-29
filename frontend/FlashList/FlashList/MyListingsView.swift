@@ -11,6 +11,7 @@ struct ListingItem: Identifiable, Codable {
     let owner: String
     let created_at: String
     let marketplaces: [String]
+    let marketplace_status: [String: String]
 }
 
 struct MyListingsView: View {
@@ -125,6 +126,38 @@ struct ListingRowView: View {
     }
 }
 
+struct MarketplaceStatusView: View {
+    let marketplace: String
+    let status: String
+    
+    var statusColor: Color {
+        switch status.lowercased() {
+        case "posted":
+            return .green
+        case "failed":
+            return .red
+        case "pending":
+            return .orange
+        default:
+            return .gray
+        }
+    }
+    
+    var body: some View {
+        HStack {
+            Text(marketplace)
+            Spacer()
+            Text(status.capitalized)
+                .foregroundColor(statusColor)
+        }
+        .font(.subheadline)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(statusColor.opacity(0.1))
+        .clipShape(Capsule())
+    }
+}
+
 struct ListingDetailView: View {
     @Environment(\.presentationMode) var presentationMode
     @State var listing: ListingItem
@@ -214,6 +247,19 @@ struct ListingDetailView: View {
                     }
                 }
                 .padding()
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Marketplace Status")
+                        .font(.headline)
+                        .padding(.top, 8)
+                    
+                    ForEach(listing.marketplaces, id: \.self) { marketplace in
+                        MarketplaceStatusView(
+                            marketplace: marketplace,
+                            status: listing.marketplace_status[marketplace] ?? "pending"
+                        )
+                    }
+                }
             }
         }
         .navigationBarTitleDisplayMode(.inline)
