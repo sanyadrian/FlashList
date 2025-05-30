@@ -176,12 +176,13 @@ struct FacebookShareButton: View {
     
     var body: some View {
         Button(action: {
-            showingSafari = true
+            let listingURL = "http://localhost:8000/listing/public/\(listingId)"
+            let shareURL = "https://www.facebook.com/sharer/sharer.php?u=\(listingURL)"
+            if let url = URL(string: shareURL) {
+                UIApplication.shared.open(url)
+            }
         }) {
             Label("Share on Facebook", systemImage: "square.and.arrow.up")
-        }
-        .sheet(isPresented: $showingSafari) {
-            SafariView(url: URL(string: "https://www.facebook.com/sharer/sharer.php?u=https://flashlist.app/listing/\(listingId)")!)
         }
     }
 }

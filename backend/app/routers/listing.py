@@ -10,6 +10,7 @@ from app.models.listing_db import Listing as DBListing
 from sqlmodel import Session
 import uuid
 import json
+from fastapi.responses import HTMLResponse
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
@@ -127,3 +128,39 @@ def delete_listing(listing_id: str, user=Depends(get_current_user)):
         session.delete(listing)
         session.commit()
         return {"message": "Listing deleted"}
+
+
+@router.get("/public/{listing_id}", response_class=HTMLResponse)
+def get_public_listing(listing_id: str):
+    with get_session() as session:
+        listing = session.get(DBListing, listing_id)
+        if not listing:
+            raise HTTPException(status_code=404, detail="Listing not found")
+            
+        # Get the first image URL
+        image_url = ""
+        if listing.image_filenames:
+            first_image = listing.image_filenames.split(",")[0]
+            image_url = f"http://localhost:8000/images/{first_image}"
+            
+        # Create the HTML with Open Graph meta tags
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>{listing.title}</title>
+            <meta property="og:title" content="{listing.title}" />
+            <meta property="og:description" content="{listing.description}" />
+            <meta property="og:image" content="{image_url}" />
+            <meta property="og:url" content="http://localhost:8000/listing/public/{listing_id}" />
+            <meta property="og:type" content="website" />
+        </head>
+        <body>
+            <h1>{listing.title}</h1>
+            <p>{listing.description}</p>
+            <p>Price: ${listing.price}</p>
+            <p>Category: {listing.category}</p>
+        </body>
+        </html>
+        """
+        return html_content
