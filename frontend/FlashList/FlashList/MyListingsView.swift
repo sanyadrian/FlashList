@@ -173,16 +173,33 @@ struct SafariView: UIViewControllerRepresentable {
 struct FacebookShareButton: View {
     var listingId: String
     @State private var showingSafari = false
+    @State private var shareURL: URL?
     
     var body: some View {
         Button(action: {
-            let listingURL = "http://localhost:8000/listing/public/\(listingId)"
-            let shareURL = "https://www.facebook.com/sharer/sharer.php?u=\(listingURL)"
-            if let url = URL(string: shareURL) {
-                UIApplication.shared.open(url)
+            Task {
+                let listingURL = "https://flashlist.app/listing/\(listingId)"
+                let encodedURL = listingURL.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+                let shareURLString = "https://www.facebook.com/sharer/sharer.php?u=\(encodedURL)"
+                print("Listing URL: \(listingURL)")
+                print("Encoded URL: \(encodedURL)")
+                print("Share URL: \(shareURLString)")
+                
+                if let url = URL(string: shareURLString) {
+                    shareURL = url
+                    let success = await UIApplication.shared.open(url)
+                    if !success {
+                        showingSafari = true
+                    }
+                }
             }
         }) {
             Label("Share on Facebook", systemImage: "square.and.arrow.up")
+        }
+        .sheet(isPresented: $showingSafari) {
+            if let url = shareURL {
+                SafariView(url: url)
+            }
         }
     }
 }

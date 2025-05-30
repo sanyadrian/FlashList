@@ -137,13 +137,11 @@ def get_public_listing(listing_id: str):
         if not listing:
             raise HTTPException(status_code=404, detail="Listing not found")
             
-        # Get the first image URL
         image_url = ""
         if listing.image_filenames:
             first_image = listing.image_filenames.split(",")[0]
             image_url = f"http://localhost:8000/images/{first_image}"
             
-        # Create the HTML with Open Graph meta tags
         html_content = f"""
         <!DOCTYPE html>
         <html>
@@ -154,6 +152,7 @@ def get_public_listing(listing_id: str):
             <meta property="og:image" content="{image_url}" />
             <meta property="og:url" content="http://localhost:8000/listing/public/{listing_id}" />
             <meta property="og:type" content="website" />
+            <meta property="og:site_name" content="FlashList" />
         </head>
         <body>
             <h1>{listing.title}</h1>
