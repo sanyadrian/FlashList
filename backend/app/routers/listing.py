@@ -7,11 +7,12 @@ from fastapi import HTTPException
 from app.models.listing import Listing
 from app.db import get_session
 from app.models.listing_db import Listing as DBListing
-from sqlmodel import Session
+from sqlmodel import Session, select
 import uuid
 import json
 from fastapi.responses import HTMLResponse
-
+from pydantic import BaseModel
+from typing import Optional
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
@@ -23,6 +24,10 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
         raise HTTPException(status_code=401, detail="Invalid token")
 
 router = APIRouter(prefix="/listing", tags=["Listing"])
+
+class EbayDeletionRequest(BaseModel):
+    ebay_item_id: str
+    listing_id: Optional[str] = None  # Optional since we'll primarily use ebay_item_id
 
 @router.post("/create")
 def create_listing(data: Listing, user=Depends(get_current_user)):
@@ -163,3 +168,40 @@ def get_public_listing(listing_id: str):
         </html>
         """
         return html_content
+
+@router.post("/ebay/deletion-notification")
+async def handle_ebay_deletion(data: EbayDeletionRequest):
+    """
+    Handle deletion notifications from eBay.
+    This endpoint is called by eBay when a listing needs to be deleted.
+    """
+    with get_session() as session:
+        statement = select(DBListing).where(DBListing.ebay_item_id == data.ebay_item_id)
+        listing = session.exec(statement).first()
+        
+        if not listing:
+            raise HTTPException(status_code=404, detail="Listing not found for the given eBay item ID")
+        
+        if "eBay" not in listing.marketplaces.split(","):
+            raise HTTPException(status_code=400, detail="Listing is not associated with eBay")
+        
+        marketplace_status = json.loads(listing.marketplace_status)
+        marketplace_status["eBay"] = "deleted"
+        listing.marketplace_status = json.dumps(marketplace_status)
+        
+        if len(listing.marketplaces.split(",")) == 1:
+            session.delete(listing)
+        else:
+            marketplaces = listing.marketplaces.split(",")
+            marketplaces.remove("eBay")
+            listing.marketplaces = ",".join(marketplaces)
+            session.add(listing)
+        
+        session.commit()
+        
+        return {
+            "status": "success",
+            "message": "Deletion processed successfully",
+            "ebay_item_id": data.ebay_item_id,
+            "listing_id": listing.id
+        }

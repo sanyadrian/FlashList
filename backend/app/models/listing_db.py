@@ -14,3 +14,4 @@ class Listing(SQLModel, table=True):
     marketplace_status: str = Field(default="{}")
     price: float
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    ebay_item_id: Optional[str] = Field(default=None, index=True)
