@@ -5,7 +5,7 @@ from fastapi import HTTPException
 
 # S3 configuration
 BUCKET_NAME = "flashlist-images"
-REGION = "us-east-1"  # Change this to your S3 bucket region
+REGION = "us-east-2" 
 
 def get_s3_client():
     """Get S3 client with credentials from environment variables"""
@@ -24,10 +24,9 @@ def upload_file_to_s3(file_data: bytes, file_name: str) -> str:
             Bucket=BUCKET_NAME,
             Key=file_name,
             Body=file_data,
-            ContentType='image/jpeg'  # Adjust content type as needed
+            ContentType='image/jpeg' 
         )
         
-        # Generate the URL for the uploaded file
         url = f"https://{BUCKET_NAME}.s3.{REGION}.amazonaws.com/{file_name}"
         return url
     except ClientError as e:
