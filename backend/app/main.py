@@ -2,12 +2,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import listing, image_upload, listing_ai, pricing, auth_router, admin
 from app.db import create_db_and_tables
-from fastapi.staticfiles import StaticFiles
 
 app = FastAPI()
 create_db_and_tables()
-
-app.mount("/images", StaticFiles(directory="images"), name="images")
 
 app.add_middleware(
     CORSMiddleware,
@@ -23,7 +20,6 @@ app.include_router(listing_ai.router)
 app.include_router(pricing.router)
 app.include_router(auth_router.router)
 app.include_router(admin.router)
-
 
 @app.get("/")
 def root():

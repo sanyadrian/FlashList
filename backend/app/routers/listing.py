@@ -13,6 +13,7 @@ import json
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from typing import Optional
+from app.utils.s3 import BUCKET_NAME, REGION
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
@@ -145,7 +146,7 @@ def get_public_listing(listing_id: str):
         image_url = ""
         if listing.image_filenames:
             first_image = listing.image_filenames.split(",")[0]
-            image_url = f"http://localhost:8000/images/{first_image}"
+            image_url = f"https://{BUCKET_NAME}.s3.{REGION}.amazonaws.com/{first_image}"
             
         html_content = f"""
         <!DOCTYPE html>
