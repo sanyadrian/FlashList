@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from openai import OpenAI
+from app.utils.s3 import BUCKET_NAME, get_s3_client
 
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -27,13 +28,14 @@ def extract_json_from_response(text: str):
 
 @router.post("/")
 async def generate_listing(data: ListingRequest):
-    image_path = os.path.join("images", data.filename)
-
-    if not os.path.exists(image_path):
+    s3_client = get_s3_client()
+    try:
+        s3_response = s3_client.get_object(Bucket=BUCKET_NAME, Key=data.filename)
+        image_bytes = s3_response['Body'].read()
+    except Exception as e:
         raise HTTPException(status_code=404, detail="Image not found")
 
-    with open(image_path, "rb") as img_file:
-        encoded_image = base64.b64encode(img_file.read()).decode("utf-8")
+    encoded_image = base64.b64encode(image_bytes).decode("utf-8")
 
     response = client.chat.completions.create(
         model="gpt-4o",

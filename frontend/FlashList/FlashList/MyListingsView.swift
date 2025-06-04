@@ -72,13 +72,17 @@ struct MyListingsView: View {
         isLoading = true
         defer { isLoading = false }
         
-        guard let url = URL(string: "http://localhost:8000/listing/my") else { return }
+        guard let url = URL(string: Config.apiURL("/listing/my")) else { return }
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         if let token = UserDefaults.standard.string(forKey: "access_token") {
+            print("Token being sent: \(token)")
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        } else {
+            print("No access token found in UserDefaults")
         }
+        print("Requesting: \(url)")
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
             
@@ -100,7 +104,7 @@ struct ListingRowView: View {
     var body: some View {
         HStack(spacing: 12) {
             if let firstImage = listing.image_filenames.first,
-               let url = URL(string: "http://localhost:8000/images/\(firstImage)") {
+               let url = URL(string: Config.apiURL("/images/\(firstImage)")) {
                 AsyncImage(url: url) { image in
                     image
                         .resizable()
@@ -220,7 +224,7 @@ struct ListingDetailView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
                         ForEach(listing.image_filenames, id: \.self) { filename in
-                            if let url = URL(string: "http://localhost:8000/images/\(filename)") {
+                            if let url = URL(string: Config.apiURL("/images/\(filename)")) {
                                 AsyncImage(url: url) { image in
                                     image
                                         .resizable()
@@ -355,7 +359,7 @@ struct ListingDetailView: View {
 
     func deleteListing() {
         isDeleting = true
-        guard let url = URL(string: "http://localhost:8000/listing/\(listing.id)") else { return }
+        guard let url = URL(string: Config.apiURL("/listing/\(listing.id)")) else { return }
         var request = URLRequest(url: url)
         request.httpMethod = "DELETE"
         if let token = UserDefaults.standard.string(forKey: "access_token") {

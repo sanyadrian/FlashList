@@ -116,7 +116,7 @@ struct EditListingView: View {
             marketplaces: Array(selectedMarketplaces),
             marketplace_status: listing.marketplace_status
         )
-        guard let url = URL(string: "http://localhost:8000/listing/\(listing.id)") else { return }
+        guard let url = URL(string: Config.apiURL("/listing/\(listing.id)")) else { return }
         var request = URLRequest(url: url)
         request.httpMethod = "PUT"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")

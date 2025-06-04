@@ -428,7 +428,7 @@ struct CreateView: View {
             price: priceDouble,
             image_filenames: photoFilenames
         )
-        guard let url = URL(string: "http://localhost:8000/listing/create") else { return }
+        guard let url = URL(string: Config.apiURL("/listing/create")) else { return }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -474,7 +474,7 @@ struct CreateView: View {
         isGenerating = true
         errorMessage = nil
         
-        guard let url = URL(string: "http://localhost:8000/generate/") else { return }
+        guard let url = URL(string: Config.apiURL("/generate/")) else { return }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -517,7 +517,7 @@ struct CreateView: View {
     }
     
     func uploadPhoto(_ img: UIImage) {
-        guard let url = URL(string: "http://localhost:8000/upload/"),
+        guard let url = URL(string: Config.apiURL("/upload/")),
               let jpegData = img.jpegData(compressionQuality: 0.8) else { return }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -530,6 +530,9 @@ struct CreateView: View {
         body.append(jpegData)
         body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
         URLSession.shared.uploadTask(with: request, from: body) { data, response, error in
+            if let data = data, let responseString = String(data: data, encoding: .utf8) {
+                print("Upload response: \(responseString)")
+            }
             guard let data = data, error == nil,
                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let filename = json["filename"] as? String else {

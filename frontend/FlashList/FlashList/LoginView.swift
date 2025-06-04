@@ -159,7 +159,7 @@ struct LoginView: View {
             isLoading = false
             return
         }
-        guard let url = URL(string: "http://localhost:8000/auth/login") else {
+        guard let url = URL(string: Config.apiURL("/auth/login")) else {
             errorMessage = "Invalid URL"
             isLoading = false
             return

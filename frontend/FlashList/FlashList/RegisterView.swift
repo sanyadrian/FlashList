@@ -114,11 +114,12 @@ struct RegisterView: View {
             isLoading = false
             return
         }
-        guard let url = URL(string: "http://localhost:8000/auth/register") else {
+        guard let url = URL(string: Config.apiURL("/auth/register")) else {
             errorMessage = "Invalid URL"
             isLoading = false
             return
         }
+        print("Registering at URL: \(url)")
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")

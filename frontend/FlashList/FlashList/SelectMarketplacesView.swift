@@ -118,7 +118,7 @@ struct SelectMarketplacesView: View {
             image_filenames: draft.photoFilenames,
             marketplaces: selectedMarketplaces
         )
-        guard let url = URL(string: "http://localhost:8000/listing/create") else { return }
+        guard let url = URL(string: Config.apiURL("/listing/create")) else { return }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")

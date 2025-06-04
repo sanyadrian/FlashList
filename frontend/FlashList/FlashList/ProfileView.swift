@@ -75,7 +75,7 @@ struct ProfileView: View {
     func startPoshmarkOAuth() {  }
 
     func fetchUserInfo() {
-        guard let url = URL(string: "http://localhost:8000/auth/me") else { return }
+        guard let url = URL(string: Config.apiURL("/auth/me")) else { return }
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -145,7 +145,7 @@ struct EditProfileView: View {
             errorMessage = "Passwords do not match"
             return
         }
-        guard let url = URL(string: "http://localhost:8000/auth/update") else { return }
+        guard let url = URL(string: Config.apiURL("/auth/update")) else { return }
         var request = URLRequest(url: url)
         request.httpMethod = "PUT"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
