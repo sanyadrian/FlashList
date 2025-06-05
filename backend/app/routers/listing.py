@@ -200,7 +200,6 @@ async def handle_ebay_deletion(
     Handle deletion notifications from eBay.
     This endpoint is called by eBay when a marketplace account is deleted.
     """
-    # Log the raw request data
     body = await request.body()
     print("=== eBay Deletion Notification Debug Info ===")
     print(f"Raw Request Body: {body}")
@@ -208,27 +207,15 @@ async def handle_ebay_deletion(
     print(f"X-EBAY-SIGNATURE: {x_ebay_signature}")
     print("===========================================")
 
-    # Validate verification token
-    expected_token = os.getenv("EBAY_VERIFICATION_TOKEN")
-    if not expected_token:
-        raise HTTPException(status_code=500, detail="Verification token not configured")
-    
-    if x_ebay_signature != expected_token:
-        raise HTTPException(status_code=401, detail="Invalid verification token")
-
     try:
-        # Parse the request body
         data = await request.json()
         print(f"Parsed JSON data: {data}")
         
-        # Validate the notification format
         notification_request = EbayNotificationRequest(**data)
         
-        # Get the user ID from the notification
         user_id = notification_request.notification.data.userId
         
         with get_session() as session:
-            # Find all listings associated with this user
             listings = session.query(DBListing).filter(DBListing.owner == user_id).all()
             
             for listing in listings:
