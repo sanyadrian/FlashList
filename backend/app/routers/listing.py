@@ -14,6 +14,7 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from typing import Optional
 from app.utils.s3 import BUCKET_NAME, REGION
+import os
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
@@ -28,7 +29,8 @@ router = APIRouter(prefix="/listing", tags=["Listing"])
 
 class EbayDeletionRequest(BaseModel):
     ebay_item_id: str
-    listing_id: Optional[str] = None  # Optional since we'll primarily use ebay_item_id
+    listing_id: Optional[str] = None 
+    verification_token: str 
 
 @router.post("/create")
 def create_listing(data: Listing, user=Depends(get_current_user)):
@@ -176,6 +178,13 @@ async def handle_ebay_deletion(data: EbayDeletionRequest):
     Handle deletion notifications from eBay.
     This endpoint is called by eBay when a listing needs to be deleted.
     """
+    expected_token = os.getenv("EBAY_VERIFICATION_TOKEN")
+    if not expected_token:
+        raise HTTPException(status_code=500, detail="Verification token not configured")
+    
+    if data.verification_token != expected_token:
+        raise HTTPException(status_code=401, detail="Invalid verification token")
+
     with get_session() as session:
         statement = select(DBListing).where(DBListing.ebay_item_id == data.ebay_item_id)
         listing = session.exec(statement).first()
