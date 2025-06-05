@@ -231,8 +231,13 @@ async def handle_ebay_challenge(request: Request, challenge_code: str = Query(..
     if not expected_token:
         raise HTTPException(status_code=500, detail="Verification token not configured")
     
-    # Get the full endpoint URL from the request
-    endpoint = str(request.url).split("?")[0]  # Remove query parameters
+    # Get the full endpoint URL from the request, ensuring it's the base URL without query parameters
+    endpoint = str(request.base_url) + "listing/ebay/deletion-notification"
+    
+    # Log the values for debugging
+    print(f"Challenge Code: {challenge_code}")
+    print(f"Verification Token: {expected_token}")
+    print(f"Endpoint URL: {endpoint}")
     
     # Create the hash as per eBay's requirements
     # Order: challengeCode + verificationToken + endpoint
@@ -241,6 +246,8 @@ async def handle_ebay_challenge(request: Request, challenge_code: str = Query(..
     m.update(expected_token.encode('utf-8'))
     m.update(endpoint.encode('utf-8'))
     challenge_response = m.hexdigest()
+    
+    print(f"Challenge Response: {challenge_response}")
     
     # Return the response in the required format
     return JSONResponse(
