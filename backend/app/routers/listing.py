@@ -177,13 +177,22 @@ def get_public_listing(listing_id: str):
 
 @router.post("/ebay/deletion-notification")
 async def handle_ebay_deletion(
-    data: EbayDeletionRequest,
+    request: Request,
     x_ebay_signature: str = Header(..., alias="X-EBAY-SIGNATURE")
 ):
     """
     Handle deletion notifications from eBay.
     This endpoint is called by eBay when a listing needs to be deleted.
     """
+    # Log the raw request data
+    body = await request.body()
+    print("=== eBay Deletion Notification Debug Info ===")
+    print(f"Raw Request Body: {body}")
+    print(f"Headers: {request.headers}")
+    print(f"X-EBAY-SIGNATURE: {x_ebay_signature}")
+    print("===========================================")
+
+    # Validate verification token
     expected_token = os.getenv("EBAY_VERIFICATION_TOKEN")
     if not expected_token:
         raise HTTPException(status_code=500, detail="Verification token not configured")
@@ -191,36 +200,51 @@ async def handle_ebay_deletion(
     if x_ebay_signature != expected_token:
         raise HTTPException(status_code=401, detail="Invalid verification token")
 
-    with get_session() as session:
-        statement = select(DBListing).where(DBListing.ebay_item_id == data.ebay_item_id)
-        listing = session.exec(statement).first()
+    try:
+        # Parse the request body
+        data = await request.json()
+        print(f"Parsed JSON data: {data}")
         
-        if not listing:
-            raise HTTPException(status_code=404, detail="Listing not found for the given eBay item ID")
-        
-        if "eBay" not in listing.marketplaces.split(","):
-            raise HTTPException(status_code=400, detail="Listing is not associated with eBay")
-        
-        marketplace_status = json.loads(listing.marketplace_status)
-        marketplace_status["eBay"] = "deleted"
-        listing.marketplace_status = json.dumps(marketplace_status)
-        
-        if len(listing.marketplaces.split(",")) == 1:
-            session.delete(listing)
-        else:
-            marketplaces = listing.marketplaces.split(",")
-            marketplaces.remove("eBay")
-            listing.marketplaces = ",".join(marketplaces)
-            session.add(listing)
-        
-        session.commit()
-        
-        return {
-            "status": "success",
-            "message": "Deletion processed successfully",
-            "ebay_item_id": data.ebay_item_id,
-            "listing_id": listing.id
-        }
+        # Extract the eBay item ID from the data
+        ebay_item_id = data.get("ebay_item_id")
+        if not ebay_item_id:
+            raise HTTPException(status_code=400, detail="ebay_item_id is required")
+
+        with get_session() as session:
+            statement = select(DBListing).where(DBListing.ebay_item_id == ebay_item_id)
+            listing = session.exec(statement).first()
+            
+            if not listing:
+                raise HTTPException(status_code=404, detail="Listing not found for the given eBay item ID")
+            
+            if "eBay" not in listing.marketplaces.split(","):
+                raise HTTPException(status_code=400, detail="Listing is not associated with eBay")
+            
+            marketplace_status = json.loads(listing.marketplace_status)
+            marketplace_status["eBay"] = "deleted"
+            listing.marketplace_status = json.dumps(marketplace_status)
+            
+            if len(listing.marketplaces.split(",")) == 1:
+                session.delete(listing)
+            else:
+                marketplaces = listing.marketplaces.split(",")
+                marketplaces.remove("eBay")
+                listing.marketplaces = ",".join(marketplaces)
+                session.add(listing)
+            
+            session.commit()
+            
+            return {
+                "status": "success",
+                "message": "Deletion processed successfully",
+                "ebay_item_id": ebay_item_id,
+                "listing_id": listing.id
+            }
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid JSON in request body")
+    except Exception as e:
+        print(f"Error processing request: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error processing request: {str(e)}")
 
 @router.get("/ebay/deletion-notification")
 async def handle_ebay_challenge(request: Request, challenge_code: str = Query(...)):
