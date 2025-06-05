@@ -1,22 +1,22 @@
 from fastapi import APIRouter
 import uuid
-from fastapi import Depends
+from fastapi import Depends, Query, Request
 from fastapi.security import OAuth2PasswordBearer
 from app.auth.auth_handler import decode_token
-from fastapi import HTTPException
+from fastapi import HTTPException, Header
 from app.models.listing import Listing
 from app.db import get_session
 from app.models.listing_db import Listing as DBListing
 from sqlmodel import Session, select
 import uuid
 import json
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 from typing import Optional
 from app.utils.s3 import BUCKET_NAME, REGION
 import os
-from fastapi import Header
 from dotenv import load_dotenv
+import hashlib
 
 load_dotenv()
 
@@ -221,3 +221,29 @@ async def handle_ebay_deletion(
             "ebay_item_id": data.ebay_item_id,
             "listing_id": listing.id
         }
+
+@router.get("/ebay/deletion-notification")
+async def handle_ebay_challenge(request: Request, challenge_code: str = Query(...)):
+    """
+    Handle eBay's challenge request for marketplace account deletion notification endpoint validation.
+    """
+    expected_token = os.getenv("EBAY_VERIFICATION_TOKEN")
+    if not expected_token:
+        raise HTTPException(status_code=500, detail="Verification token not configured")
+    
+    # Get the full endpoint URL from the request
+    endpoint = str(request.url).split("?")[0]  # Remove query parameters
+    
+    # Create the hash as per eBay's requirements
+    # Order: challengeCode + verificationToken + endpoint
+    m = hashlib.sha256()
+    m.update(challenge_code.encode('utf-8'))
+    m.update(expected_token.encode('utf-8'))
+    m.update(endpoint.encode('utf-8'))
+    challenge_response = m.hexdigest()
+    
+    # Return the response in the required format
+    return JSONResponse(
+        content={"challengeResponse": challenge_response},
+        headers={"Content-Type": "application/json"}
+    )
