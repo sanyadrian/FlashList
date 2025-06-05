@@ -12,7 +12,7 @@ import uuid
 import json
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Dict, Any
 from app.utils.s3 import BUCKET_NAME, REGION
 import os
 from dotenv import load_dotenv
@@ -34,6 +34,22 @@ router = APIRouter(prefix="/listing", tags=["Listing"])
 class EbayDeletionRequest(BaseModel):
     ebay_item_id: str
     listing_id: Optional[str] = None  # Optional since we'll primarily use ebay_item_id
+
+class EbayNotificationData(BaseModel):
+    username: str
+    userId: str
+    eiasToken: str
+
+class EbayNotification(BaseModel):
+    notificationId: str
+    eventDate: str
+    publishDate: str
+    publishAttemptCount: int
+    data: EbayNotificationData
+
+class EbayNotificationRequest(BaseModel):
+    metadata: Dict[str, Any]
+    notification: EbayNotification
 
 @router.post("/create")
 def create_listing(data: Listing, user=Depends(get_current_user)):
@@ -182,7 +198,7 @@ async def handle_ebay_deletion(
 ):
     """
     Handle deletion notifications from eBay.
-    This endpoint is called by eBay when a listing needs to be deleted.
+    This endpoint is called by eBay when a marketplace account is deleted.
     """
     # Log the raw request data
     body = await request.body()
@@ -205,40 +221,37 @@ async def handle_ebay_deletion(
         data = await request.json()
         print(f"Parsed JSON data: {data}")
         
-        # Extract the eBay item ID from the data
-        ebay_item_id = data.get("ebay_item_id")
-        if not ebay_item_id:
-            raise HTTPException(status_code=400, detail="ebay_item_id is required")
-
+        # Validate the notification format
+        notification_request = EbayNotificationRequest(**data)
+        
+        # Get the user ID from the notification
+        user_id = notification_request.notification.data.userId
+        
         with get_session() as session:
-            statement = select(DBListing).where(DBListing.ebay_item_id == ebay_item_id)
-            listing = session.exec(statement).first()
+            # Find all listings associated with this user
+            listings = session.query(DBListing).filter(DBListing.owner == user_id).all()
             
-            if not listing:
-                raise HTTPException(status_code=404, detail="Listing not found for the given eBay item ID")
-            
-            if "eBay" not in listing.marketplaces.split(","):
-                raise HTTPException(status_code=400, detail="Listing is not associated with eBay")
-            
-            marketplace_status = json.loads(listing.marketplace_status)
-            marketplace_status["eBay"] = "deleted"
-            listing.marketplace_status = json.dumps(marketplace_status)
-            
-            if len(listing.marketplaces.split(",")) == 1:
-                session.delete(listing)
-            else:
-                marketplaces = listing.marketplaces.split(",")
-                marketplaces.remove("eBay")
-                listing.marketplaces = ",".join(marketplaces)
-                session.add(listing)
+            for listing in listings:
+                if "eBay" in listing.marketplaces.split(","):
+                    marketplace_status = json.loads(listing.marketplace_status)
+                    marketplace_status["eBay"] = "deleted"
+                    listing.marketplace_status = json.dumps(marketplace_status)
+                    
+                    if len(listing.marketplaces.split(",")) == 1:
+                        session.delete(listing)
+                    else:
+                        marketplaces = listing.marketplaces.split(",")
+                        marketplaces.remove("eBay")
+                        listing.marketplaces = ",".join(marketplaces)
+                        session.add(listing)
             
             session.commit()
             
             return {
                 "status": "success",
-                "message": "Deletion processed successfully",
-                "ebay_item_id": ebay_item_id,
-                "listing_id": listing.id
+                "message": "Account deletion processed successfully",
+                "userId": user_id,
+                "affected_listings": len(listings)
             }
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="Invalid JSON in request body")
