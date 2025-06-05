@@ -231,7 +231,7 @@ async def handle_ebay_challenge(request: Request, challenge_code: str = Query(..
     if not expected_token:
         raise HTTPException(status_code=500, detail="Verification token not configured")
     
-    endpoint = str(request.url).split("?")[0]
+    endpoint = str(request.url).split("?")[0].replace("http://", "https://")
     
     print("=== eBay Challenge Debug Info ===")
     print(f"Challenge Code: {challenge_code}")
