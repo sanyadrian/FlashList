@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import auth, listing, ebay_oauth, image_upload, listing_ai, pricing, auth_router, admin
+from app.routers import listing, ebay_oauth, image_upload, listing_ai, pricing, auth_router, admin
 from app.db import create_db_and_tables
 
 app = FastAPI()
@@ -15,7 +15,7 @@ app.add_middleware(
 )
 
 # Include routers
-app.include_router(auth.router)
+# app.include_router(auth.router)
 app.include_router(listing.router)
 app.include_router(ebay_oauth.router)
 app.include_router(image_upload.router)
