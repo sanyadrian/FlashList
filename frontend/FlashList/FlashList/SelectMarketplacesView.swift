@@ -20,6 +20,8 @@ struct SelectMarketplacesView: View {
     @State private var errorMessage: String? = nil
     @State private var showSuccess = false
     @State private var navigateToMyListings = false
+    @State private var showEbayAuth = false
+    @State private var hasEbayAuth = false
     
     let marketplaces: [Marketplace] = [
         Marketplace(name: "Facebook Marketplace", subtitle: "Reach a large audience of local buyers", icon: "f.circle"),
@@ -58,7 +60,14 @@ struct SelectMarketplacesView: View {
                             Spacer()
                             Toggle("", isOn: Binding(
                                 get: { selections[market.name] ?? false },
-                                set: { selections[market.name] = $0 }
+                                set: { newValue in
+                                    if market.name == "eBay" && newValue && !hasEbayAuth {
+                                        showEbayAuth = true
+                                        selections[market.name] = false
+                                    } else {
+                                        selections[market.name] = newValue
+                                    }
+                                }
                             ))
                             .labelsHidden()
                         }
@@ -98,6 +107,30 @@ struct SelectMarketplacesView: View {
         .navigationDestination(isPresented: $navigateToMyListings) {
             MyListingsView()
         }
+        .sheet(isPresented: $showEbayAuth) {
+            SafariView(url: URL(string: Config.apiURL("/ebay/oauth/start"))!)
+        }
+        .onAppear {
+            checkEbayAuth()
+        }
+    }
+    
+    private func checkEbayAuth() {
+        guard let url = URL(string: Config.apiURL("/ebay/oauth/status")) else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        if let token = UserDefaults.standard.string(forKey: "access_token") {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let httpResponse = response as? HTTPURLResponse,
+               httpResponse.statusCode == 200 {
+                DispatchQueue.main.async {
+                    self.hasEbayAuth = true
+                }
+            }
+        }.resume()
     }
     
     private func createListing() {
@@ -147,6 +180,17 @@ struct SelectMarketplacesView: View {
                 navigateToMyListings = true
             }
         }.resume()
+    }
+}
+
+struct SafariView: UIViewControllerRepresentable {
+    let url: URL
+    
+    func makeUIViewController(context: UIViewControllerRepresentableContext<SafariView>) -> SFSafariViewController {
+        return SFSafariViewController(url: url)
+    }
+    
+    func updateUIViewController(_ uiViewController: SFSafariViewController, context: UIViewControllerRepresentableContext<SafariView>) {
     }
 }
 

@@ -11,13 +11,13 @@ router = APIRouter(prefix="/upload", tags=["Image Upload"])
 async def upload_image(file: UploadFile = File(...)):
     file_ext = file.filename.split(".")[-1]
     file_name = f"{uuid4()}.{file_ext}"
-    
+
     # Read file content
     file_content = await file.read()
-    
+
     # Upload to S3
     url = upload_file_to_s3(file_content, file_name)
-    
+
     return {
         "filename": file_name,
         "url": url,
