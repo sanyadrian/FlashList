@@ -1,4 +1,5 @@
 import SwiftUI
+import SafariServices
 
 struct Marketplace: Identifiable {
     let id = UUID()
@@ -180,17 +181,6 @@ struct SelectMarketplacesView: View {
                 navigateToMyListings = true
             }
         }.resume()
-    }
-}
-
-struct SafariView: UIViewControllerRepresentable {
-    let url: URL
-    
-    func makeUIViewController(context: UIViewControllerRepresentableContext<SafariView>) -> SFSafariViewController {
-        return SFSafariViewController(url: url)
-    }
-    
-    func updateUIViewController(_ uiViewController: SFSafariViewController, context: UIViewControllerRepresentableContext<SafariView>) {
     }
 }
 

@@ -169,6 +169,11 @@ struct LoginView: View {
         let bodyString = "username=\(username.lowercased())&password=\(password)"
         request.httpBody = bodyString.data(using: .utf8)
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+
+        print("LOGIN REQUEST URL: \(url)")
+        print("LOGIN REQUEST BODY: \(bodyString)")
+        print("LOGIN REQUEST HEADERS: \(request.allHTTPHeaderFields ?? [:])")
+        
         URLSession.shared.dataTask(with: request) { data, response, error in
             DispatchQueue.main.async {
                 isLoading = false
