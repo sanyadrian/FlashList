@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi import APIRouter, HTTPException, Depends, Request, Query
 from fastapi.responses import RedirectResponse
 from app.auth.auth_handler import decode_token
 from fastapi.security import OAuth2PasswordBearer
@@ -33,17 +33,29 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
         raise HTTPException(status_code=401, detail="Invalid token")
 
 @router.get("/start")
-async def start_oauth(user: str = Depends(get_current_user)):
+async def start_oauth(token: str = Query(None)):
     """
     Start the eBay OAuth flow by redirecting the user to eBay's login page.
+    Accepts a 'token' query parameter for authentication (for SafariView compatibility).
     """
+    user = None
+    if token:
+        try:
+            payload = decode_token(token)
+            user = payload["sub"]
+            print(f"[DEBUG] /ebay/oauth/start: user from token: {user}")
+        except Exception as e:
+            print(f"[DEBUG] /ebay/oauth/start: invalid token: {e}")
+            raise HTTPException(status_code=401, detail="Invalid token in query param")
+    else:
+        print("[DEBUG] /ebay/oauth/start: no token provided")
+        raise HTTPException(status_code=401, detail="No token provided")
+
     if not all([EBAY_CLIENT_ID, EBAY_CLIENT_SECRET, EBAY_REDIRECT_URI]):
         raise HTTPException(status_code=500, detail="eBay OAuth configuration is incomplete")
 
     state = str(uuid.uuid4())
-    
-    with get_session() as session:
-        pass
+    # Optionally, you could store the state and user mapping for later validation
 
     auth_url = (
         f"{EBAY_AUTH_URL}?"

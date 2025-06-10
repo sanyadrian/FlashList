@@ -109,7 +109,12 @@ struct SelectMarketplacesView: View {
             MyListingsView()
         }
         .sheet(isPresented: $showEbayAuth) {
-            SafariView(url: URL(string: Config.apiURL("/ebay/oauth/start"))!)
+            let token = UserDefaults.standard.string(forKey: "access_token") ?? ""
+            let urlString = Config.apiURL("/ebay/oauth/start?token=\(token)")
+            SafariView(url: URL(string: urlString)!)
+                .onAppear {
+                    print("[DEBUG] eBay OAuth SafariView token: \(token)")
+                }
         }
         .onAppear {
             checkEbayAuth()
