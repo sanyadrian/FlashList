@@ -103,17 +103,19 @@ struct ListingRowView: View {
     
     var body: some View {
         HStack(spacing: 12) {
-            if let firstImage = listing.image_filenames.first,
-               let url = URL(string: Config.apiURL("/images/\(firstImage)")) {
-                AsyncImage(url: url) { image in
-                    image
-                        .resizable()
-                        .scaledToFill()
-                } placeholder: {
-                    Color.gray
+            if let firstImage = listing.image_filenames.first {
+                let s3URL = "https://flashlist-images.s3.us-east-2.amazonaws.com/\(firstImage)"
+                if let url = URL(string: s3URL) {
+                    AsyncImage(url: url) { image in
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    } placeholder: {
+                        Color.gray
+                    }
+                    .frame(width: 60, height: 60)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
-                .frame(width: 60, height: 60)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
             }
             
             VStack(alignment: .leading, spacing: 4) {
@@ -213,7 +215,8 @@ struct ListingDetailView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
                         ForEach(listing.image_filenames, id: \.self) { filename in
-                            if let url = URL(string: Config.apiURL("/images/\(filename)")) {
+                            let s3URL = "https://flashlist-images.s3.us-east-2.amazonaws.com/\(filename)"
+                            if let url = URL(string: s3URL) {
                                 AsyncImage(url: url) { image in
                                     image
                                         .resizable()

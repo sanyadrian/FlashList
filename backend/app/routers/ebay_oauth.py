@@ -160,41 +160,44 @@ async def check_ebay_auth(user: str = Depends(get_current_user)):
     """
     Check if the user has eBay authentication.
     """
+    print("[DEBUG] /ebay/oauth/status called")
+    print(f"[DEBUG] Authenticated user: {user}")
     with get_session() as session:
         token_record = session.query(EbayOAuth).filter(EbayOAuth.user_id == user).first()
-        
+        print(f"[DEBUG] eBay token record for user {user}: {token_record}")
         if not token_record:
+            print("[DEBUG] No eBay tokens found for user")
             raise HTTPException(status_code=404, detail="No eBay tokens found for user")
-            
+        print(f"[DEBUG] Token expires at: {token_record.expires_at}, now: {datetime.utcnow()}")
         # Check if token is expired
         if token_record.expires_at < datetime.utcnow():
+            print("[DEBUG] eBay token expired, attempting refresh...")
             # Try to refresh the token
             try:
                 token_data = {
                     "grant_type": "refresh_token",
                     "refresh_token": token_record.refresh_token
                 }
-
                 response = requests.post(
                     EBAY_TOKEN_URL,
                     data=token_data,
                     auth=(EBAY_CLIENT_ID, EBAY_CLIENT_SECRET),
                     headers={"Content-Type": "application/x-www-form-urlencoded"}
                 )
-
+                print(f"[DEBUG] Refresh response status: {response.status_code}, body: {response.text}")
                 if response.status_code != 200:
+                    print("[DEBUG] eBay token expired and refresh failed")
                     raise HTTPException(status_code=401, detail="eBay token expired and refresh failed")
-
                 token_response = response.json()
-                
                 # Update tokens in database
                 token_record.access_token = token_response["access_token"]
                 token_record.expires_at = datetime.utcnow() + timedelta(seconds=token_response["expires_in"])
                 token_record.updated_at = datetime.utcnow()
-                
                 session.add(token_record)
                 session.commit()
+                print("[DEBUG] eBay token refreshed successfully")
             except Exception as e:
+                print(f"[DEBUG] Exception during token refresh: {e}")
                 raise HTTPException(status_code=401, detail="eBay token expired and refresh failed")
-
+        print("[DEBUG] eBay authentication status: authenticated")
         return {"status": "authenticated"} 
