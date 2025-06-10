@@ -66,6 +66,7 @@ async def start_oauth(token: str = Query(None)):
         f"state={state}"
     )
 
+    print(f"[DEBUG] Redirecting to eBay OAuth URL: {auth_url}")
     return RedirectResponse(url=auth_url)
 
 @router.get("/callback")
