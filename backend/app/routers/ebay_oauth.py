@@ -61,7 +61,7 @@ async def start_oauth(token: str = Query(None)):
         f"{EBAY_AUTH_URL}?"
         f"client_id={EBAY_CLIENT_ID}&"
         f"response_type=code&"
-        f"redirect_uri={EBAY_REDIRECT_URI}&"
+        f"redirect_uri={EBAY_REDIRECT_URI}&"  # This is the RuName, not a URL
         f"scope={EBAY_SCOPE}&"
         f"state={state}"
     )
@@ -85,7 +85,7 @@ async def oauth_callback(
     token_data = {
         "grant_type": "authorization_code",
         "code": code,
-        "redirect_uri": EBAY_REDIRECT_URI
+        "redirect_uri": EBAY_REDIRECT_URI  # This is the RuName, not a URL
     }
 
     response = requests.post(
