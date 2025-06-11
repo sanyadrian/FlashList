@@ -79,7 +79,12 @@ async def oauth_callback(
     Handle the callback from eBay OAuth flow.
     Exchange the authorization code for access and refresh tokens.
     """
+    print("[DEBUG] /ebay/oauth/callback called")
+    print(f"[DEBUG] user: {user}")
+    print(f"[DEBUG] code: {code}")
+    print(f"[DEBUG] state: {state}")
     if not code:
+        print("[DEBUG] No authorization code provided")
         raise HTTPException(status_code=400, detail="Authorization code is missing")
 
     token_data = {
@@ -95,26 +100,31 @@ async def oauth_callback(
         headers={"Content-Type": "application/x-www-form-urlencoded"}
     )
 
+    print(f"[DEBUG] Token exchange response status: {response.status_code}")
+    print(f"[DEBUG] Token exchange response body: {response.text}")
+
     if response.status_code != 200:
+        print("[DEBUG] Failed to get access token from eBay")
         raise HTTPException(
             status_code=400,
             detail=f"Failed to get access token: {response.text}"
         )
 
     token_response = response.json()
-    
+    print(f"[DEBUG] token_response: {token_response}")
     expires_at = datetime.utcnow() + timedelta(seconds=token_response["expires_in"])
 
     with get_session() as session:
         existing_token = session.query(EbayOAuth).filter(EbayOAuth.user_id == user).first()
-        
         if existing_token:
+            print("[DEBUG] Updating existing eBay token record")
             existing_token.access_token = token_response["access_token"]
             existing_token.refresh_token = token_response["refresh_token"]
             existing_token.expires_at = expires_at
             existing_token.updated_at = datetime.utcnow()
             session.add(existing_token)
         else:
+            print("[DEBUG] Creating new eBay token record")
             new_token = EbayOAuth(
                 id=str(uuid.uuid4()),
                 user_id=user,
@@ -123,8 +133,8 @@ async def oauth_callback(
                 expires_at=expires_at
             )
             session.add(new_token)
-        
         session.commit()
+        print("[DEBUG] eBay token record saved to database")
 
     return {"message": "Successfully connected to eBay"}
 
