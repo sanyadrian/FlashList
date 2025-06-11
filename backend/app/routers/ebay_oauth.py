@@ -10,6 +10,8 @@ from dotenv import load_dotenv
 import requests
 from datetime import datetime, timedelta
 import uuid
+import base64
+import json
 
 load_dotenv()
 
@@ -54,8 +56,9 @@ async def start_oauth(token: str = Query(None)):
     if not all([EBAY_CLIENT_ID, EBAY_CLIENT_SECRET, EBAY_REDIRECT_URI]):
         raise HTTPException(status_code=500, detail="eBay OAuth configuration is incomplete")
 
-    state = str(uuid.uuid4())
-    # Optionally, you could store the state and user mapping for later validation
+    # Encode user info in state
+    state_data = {"user": user, "nonce": str(uuid.uuid4())}
+    state = base64.urlsafe_b64encode(json.dumps(state_data).encode()).decode()
 
     auth_url = (
         f"{EBAY_AUTH_URL}?"
@@ -72,20 +75,27 @@ async def start_oauth(token: str = Query(None)):
 @router.get("/callback")
 async def oauth_callback(
     code: str,
-    state: str,
-    user: str = Depends(get_current_user)
+    state: str
 ):
     """
     Handle the callback from eBay OAuth flow.
     Exchange the authorization code for access and refresh tokens.
     """
     print("[DEBUG] /ebay/oauth/callback called")
-    print(f"[DEBUG] user: {user}")
     print(f"[DEBUG] code: {code}")
     print(f"[DEBUG] state: {state}")
     if not code:
         print("[DEBUG] No authorization code provided")
         raise HTTPException(status_code=400, detail="Authorization code is missing")
+
+    # Decode user from state
+    try:
+        state_data = json.loads(base64.urlsafe_b64decode(state.encode()).decode())
+        user = state_data["user"]
+        print(f"[DEBUG] user from state: {user}")
+    except Exception as e:
+        print(f"[DEBUG] Failed to decode state: {e}")
+        raise HTTPException(status_code=400, detail="Invalid state parameter")
 
     token_data = {
         "grant_type": "authorization_code",
