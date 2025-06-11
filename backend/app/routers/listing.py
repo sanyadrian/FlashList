@@ -191,7 +191,7 @@ async def create_ebay_listing(listing: DBListing, user: str) -> str:
     return publish_response.get("listingId")
 
 @router.post("/create")
-def create_listing(data: Listing, user=Depends(get_current_user)):
+async def create_listing(data: Listing, user=Depends(get_current_user)):
     if not data.marketplaces or len(data.marketplaces) == 0:
         raise HTTPException(status_code=400, detail="At least one marketplace must be selected")
     
@@ -217,7 +217,7 @@ def create_listing(data: Listing, user=Depends(get_current_user)):
         # If eBay is selected, create the listing on eBay
         if "eBay" in data.marketplaces:
             try:
-                ebay_item_id = create_ebay_listing(listing, user)
+                ebay_item_id = await create_ebay_listing(listing, user)
                 listing.ebay_item_id = ebay_item_id
                 marketplace_status["eBay"] = "posted"
                 listing.marketplace_status = json.dumps(marketplace_status)
