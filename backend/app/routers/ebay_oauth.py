@@ -72,6 +72,102 @@ async def start_oauth(token: str = Query(None)):
     print(f"[DEBUG] Redirecting to eBay OAuth URL: {auth_url}")
     return RedirectResponse(url=auth_url)
 
+async def create_ebay_policies(user: str, token: str) -> dict:
+    """
+    Create eBay business policies (fulfillment, payment, and return policies).
+    Returns a dictionary with policy IDs.
+    """
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
+
+    # Create fulfillment policy
+    fulfillment_policy = {
+        "name": "Standard Fulfillment Policy",
+        "marketplaceId": "EBAY_US",
+        "categoryTypes": [{"name": "ALL_EXCLUDING_MOTORS_VEHICLES"}],
+        "handlingTime": {
+            "value": 1,
+            "unit": "DAY"
+        },
+        "shippingOptions": [{
+            "costType": "FLAT_RATE",
+            "optionType": "DOMESTIC",
+            "shippingServices": [{
+                "buyerResponsibleForShipping": False,
+                "buyerResponsibleForPickup": False,
+                "freeShipping": False,
+                "shippingCarrierCode": "USPS",
+                "shippingServiceCode": "USPSPriority",
+                "shippingCost": {
+                    "value": "0.00",
+                    "currency": "USD"
+                }
+            }]
+        }]
+    }
+
+    fulfillment_url = "https://api.ebay.com/sell/account/v1/fulfillment_policy"
+    response = requests.post(fulfillment_url, json=fulfillment_policy, headers=headers)
+    if response.status_code != 201:
+        print(f"[DEBUG] Failed to create fulfillment policy: {response.text}")
+        raise HTTPException(status_code=400, detail="Failed to create fulfillment policy")
+    fulfillment_policy_id = response.json()["fulfillmentPolicyId"]
+
+    # Create payment policy
+    payment_policy = {
+        "name": "Standard Payment Policy",
+        "marketplaceId": "EBAY_US",
+        "categoryTypes": [{"name": "ALL_EXCLUDING_MOTORS_VEHICLES"}],
+        "immediatePay": True,
+        "paymentMethods": ["CREDIT_CARD", "PAYPAL"]
+    }
+
+    payment_url = "https://api.ebay.com/sell/account/v1/payment_policy"
+    response = requests.post(payment_url, json=payment_policy, headers=headers)
+    if response.status_code != 201:
+        print(f"[DEBUG] Failed to create payment policy: {response.text}")
+        raise HTTPException(status_code=400, detail="Failed to create payment policy")
+    payment_policy_id = response.json()["paymentPolicyId"]
+
+    # Create return policy
+    return_policy = {
+        "name": "Standard Return Policy",
+        "marketplaceId": "EBAY_US",
+        "categoryTypes": [{"name": "ALL_EXCLUDING_MOTORS_VEHICLES"}],
+        "returnsAccepted": True,
+        "returnPeriod": {
+            "value": 30,
+            "unit": "DAY"
+        },
+        "returnShippingCostPayer": "SELLER",
+        "refundMethod": "MONEY_BACK"
+    }
+
+    return_url = "https://api.ebay.com/sell/account/v1/return_policy"
+    response = requests.post(return_url, json=return_policy, headers=headers)
+    if response.status_code != 201:
+        print(f"[DEBUG] Failed to create return policy: {response.text}")
+        raise HTTPException(status_code=400, detail="Failed to create return policy")
+    return_policy_id = response.json()["returnPolicyId"]
+
+    # Store policy IDs in database
+    with get_session() as session:
+        token_record = session.query(EbayOAuth).filter(EbayOAuth.user_id == user).first()
+        if token_record:
+            token_record.fulfillment_policy_id = fulfillment_policy_id
+            token_record.payment_policy_id = payment_policy_id
+            token_record.return_policy_id = return_policy_id
+            session.add(token_record)
+            session.commit()
+
+    return {
+        "fulfillmentPolicyId": fulfillment_policy_id,
+        "paymentPolicyId": payment_policy_id,
+        "returnPolicyId": return_policy_id
+    }
+
 @router.get("/callback")
 async def oauth_callback(
     code: str,
@@ -100,7 +196,7 @@ async def oauth_callback(
     token_data = {
         "grant_type": "authorization_code",
         "code": code,
-        "redirect_uri": EBAY_REDIRECT_URI  # This is the RuName, not a URL
+        "redirect_uri": EBAY_REDIRECT_URI
     }
 
     response = requests.post(
@@ -145,6 +241,15 @@ async def oauth_callback(
             session.add(new_token)
         session.commit()
         print("[DEBUG] eBay token record saved to database")
+
+    # Create business policies
+    try:
+        policies = await create_ebay_policies(user, token_response["access_token"])
+        print(f"[DEBUG] Created eBay business policies: {policies}")
+    except Exception as e:
+        print(f"[DEBUG] Failed to create business policies: {e}")
+        # Don't raise an exception here, as the OAuth flow was successful
+        # The policies can be created later when needed
 
     return {"message": "Successfully connected to eBay"}
 
@@ -233,4 +338,65 @@ async def check_ebay_auth(user: str = Depends(get_current_user)):
                 print(f"[DEBUG] Exception during token refresh: {e}")
                 raise HTTPException(status_code=401, detail="eBay token expired and refresh failed")
         print("[DEBUG] eBay authentication status: authenticated")
-        return {"status": "authenticated"} 
+        return {"status": "authenticated"}
+
+async def get_ebay_token(user: str) -> str:
+    """
+    Get a valid eBay access token for the user.
+    If the token is expired, it will be refreshed.
+    Returns the access token or None if no valid token exists.
+    """
+    with get_session() as session:
+        token_record = session.query(EbayOAuth).filter(EbayOAuth.user_id == user).first()
+        
+        if not token_record:
+            print(f"[DEBUG] No eBay token found for user {user}")
+            return None
+
+        # Check if token is expired
+        if token_record.expires_at < datetime.utcnow():
+            print("[DEBUG] eBay token expired, attempting refresh...")
+            try:
+                token_data = {
+                    "grant_type": "refresh_token",
+                    "refresh_token": token_record.refresh_token
+                }
+                response = requests.post(
+                    EBAY_TOKEN_URL,
+                    data=token_data,
+                    auth=(EBAY_CLIENT_ID, EBAY_CLIENT_SECRET),
+                    headers={"Content-Type": "application/x-www-form-urlencoded"}
+                )
+                
+                if response.status_code != 200:
+                    print(f"[DEBUG] Token refresh failed: {response.text}")
+                    return None
+                    
+                token_response = response.json()
+                token_record.access_token = token_response["access_token"]
+                token_record.expires_at = datetime.utcnow() + timedelta(seconds=token_response["expires_in"])
+                token_record.updated_at = datetime.utcnow()
+                session.add(token_record)
+                session.commit()
+                print("[DEBUG] eBay token refreshed successfully")
+            except Exception as e:
+                print(f"[DEBUG] Exception during token refresh: {e}")
+                return None
+
+        return token_record.access_token 
+
+@router.post("/disconnect")
+async def disconnect_ebay(user: str = Depends(get_current_user)):
+    """
+    Disconnect the user's eBay account by deleting their token record.
+    """
+    with get_session() as session:
+        token_record = session.query(EbayOAuth).filter(EbayOAuth.user_id == user).first()
+        if token_record:
+            session.delete(token_record)
+            session.commit()
+            print(f"[DEBUG] Disconnected eBay for user {user}")
+            return {"message": "Disconnected from eBay"}
+        else:
+            print(f"[DEBUG] No eBay token found for user {user} to disconnect")
+            return {"message": "No eBay connection found"} 

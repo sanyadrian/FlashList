@@ -11,6 +11,7 @@ struct ProfileView: View {
     @State private var hasOfferUpAuth = false
     @State private var hasPoshmarkAuth = false
     @State private var showEditProfile = false
+    @State private var showEbayDisconnectAlert = false
 
     var body: some View {
         NavigationView {
@@ -22,7 +23,11 @@ struct ProfileView: View {
 
                 Section(header: Text("Connected Marketplaces")) {
                     marketplaceRow(name: "Facebook", isConnected: hasFacebookAuth) { startFacebookOAuth() }
-                    marketplaceRow(name: "eBay", isConnected: hasEbayAuth) { startEbayOAuth() }
+                    marketplaceRow(name: "eBay", isConnected: hasEbayAuth, onStatusTap: {
+                        if hasEbayAuth {
+                            showEbayDisconnectAlert = true
+                        }
+                    }) { startEbayOAuth() }
                     marketplaceRow(name: "OfferUp", isConnected: hasOfferUpAuth) { startOfferUpOAuth() }
                     marketplaceRow(name: "Poshmark", isConnected: hasPoshmarkAuth) { startPoshmarkOAuth() }
                 }
@@ -52,17 +57,32 @@ struct ProfileView: View {
             }
             .onAppear {
                 fetchUserInfo()
+                checkEbayAuth()
+            }
+            .alert(isPresented: $showEbayDisconnectAlert) {
+                Alert(
+                    title: Text("Disconnect eBay"),
+                    message: Text("Are you sure you want to disconnect your eBay account?"),
+                    primaryButton: .destructive(Text("Disconnect")) {
+                        disconnectEbay()
+                    },
+                    secondaryButton: .cancel()
+                )
             }
         }
     }
 
     @ViewBuilder
-    func marketplaceRow(name: String, isConnected: Bool, connectAction: @escaping () -> Void) -> some View {
+    func marketplaceRow(name: String, isConnected: Bool, onStatusTap: (() -> Void)? = nil, connectAction: @escaping () -> Void) -> some View {
         HStack {
             Text(name)
             Spacer()
             if isConnected {
-                Text("Connected").foregroundColor(.green)
+                Text("Connected")
+                    .foregroundColor(.green)
+                    .onTapGesture {
+                        onStatusTap?()
+                    }
             } else {
                 Button("Connect", action: connectAction)
             }
@@ -87,6 +107,37 @@ struct ProfileView: View {
                     self.username = user.username
                     self.email = user.email
                 }
+            }
+        }.resume()
+    }
+
+    func checkEbayAuth() {
+        guard let url = URL(string: Config.apiURL("/ebay/oauth/status")) else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let httpResponse = response as? HTTPURLResponse,
+               httpResponse.statusCode == 200 {
+                DispatchQueue.main.async {
+                    self.hasEbayAuth = true
+                }
+            } else {
+                DispatchQueue.main.async {
+                    self.hasEbayAuth = false
+                }
+            }
+        }.resume()
+    }
+
+    func disconnectEbay() {
+        guard let url = URL(string: Config.apiURL("/ebay/oauth/disconnect")) else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            DispatchQueue.main.async {
+                self.hasEbayAuth = false
             }
         }.resume()
     }

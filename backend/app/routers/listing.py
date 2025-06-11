@@ -17,6 +17,9 @@ from app.utils.s3 import BUCKET_NAME, REGION
 import os
 from dotenv import load_dotenv
 import hashlib
+import requests
+from app.routers.ebay_oauth import get_ebay_token
+from app.models.ebay_oauth import EbayOAuth
 
 load_dotenv()
 
@@ -51,6 +54,142 @@ class EbayNotificationRequest(BaseModel):
     metadata: Dict[str, Any]
     notification: EbayNotification
 
+async def create_ebay_listing(listing: DBListing, user: str) -> str:
+    """
+    Create a listing on eBay using the Inventory API.
+    Returns the eBay item ID if successful, raises an exception if not.
+    """
+    # Get eBay token and policy IDs
+    with get_session() as session:
+        token_record = session.query(EbayOAuth).filter(EbayOAuth.user_id == user).first()
+        if not token_record:
+            raise HTTPException(status_code=401, detail="No valid eBay token found")
+        
+        token = token_record.access_token
+        fulfillment_policy_id = token_record.fulfillment_policy_id
+        payment_policy_id = token_record.payment_policy_id
+        return_policy_id = token_record.return_policy_id
+
+        if not all([fulfillment_policy_id, payment_policy_id, return_policy_id]):
+            # Try to create policies if they don't exist
+            try:
+                policies = await create_ebay_policies(user, token)
+                fulfillment_policy_id = policies["fulfillmentPolicyId"]
+                payment_policy_id = policies["paymentPolicyId"]
+                return_policy_id = policies["returnPolicyId"]
+            except Exception as e:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Failed to create eBay business policies: {str(e)}"
+                )
+
+    # Prepare the inventory item
+    inventory_item = {
+        "product": {
+            "title": listing.title,
+            "description": listing.description,
+            "aspects": {
+                "Category": [listing.category],
+                "Tags": listing.tags.split(",")
+            },
+            "imageUrls": [f"https://{BUCKET_NAME}.s3.{REGION}.amazonaws.com/{img}" for img in listing.image_filenames.split(",")]
+        },
+        "condition": "NEW",
+        "packageWeightAndSize": {
+            "weight": {
+                "value": 1,
+                "unit": "POUND"
+            }
+        },
+        "availability": {
+            "shipToLocationAvailability": {
+                "quantity": 1
+            }
+        },
+        "price": {
+            "value": str(listing.price),
+            "currency": "USD"
+        }
+    }
+
+    # Create inventory item
+    inventory_url = "https://api.ebay.com/sell/inventory/v1/inventory_item"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
+
+    response = requests.post(
+        inventory_url,
+        json=inventory_item,
+        headers=headers
+    )
+
+    if response.status_code != 200:
+        print(f"[DEBUG] eBay inventory creation failed: {response.text}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Failed to create eBay listing: {response.text}"
+        )
+
+    inventory_response = response.json()
+    sku = inventory_response.get("sku")
+
+    # Create offer
+    offer = {
+        "sku": sku,
+        "marketplaceId": "EBAY_US",
+        "format": "FIXED_PRICE",
+        "availableQuantity": 1,
+        "categoryId": "9355",  # Default category, should be mapped properly
+        "listingDescription": listing.description,
+        "listingPolicies": {
+            "fulfillmentPolicyId": fulfillment_policy_id,
+            "paymentPolicyId": payment_policy_id,
+            "returnPolicyId": return_policy_id
+        },
+        "pricingSummary": {
+            "price": {
+                "value": str(listing.price),
+                "currency": "USD"
+            }
+        }
+    }
+
+    offer_url = "https://api.ebay.com/sell/inventory/v1/offer"
+    response = requests.post(
+        offer_url,
+        json=offer,
+        headers=headers
+    )
+
+    if response.status_code != 200:
+        print(f"[DEBUG] eBay offer creation failed: {response.text}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Failed to create eBay offer: {response.text}"
+        )
+
+    offer_response = response.json()
+    offer_id = offer_response.get("offerId")
+
+    # Publish offer
+    publish_url = f"https://api.ebay.com/sell/inventory/v1/offer/{offer_id}/publish"
+    response = requests.post(
+        publish_url,
+        headers=headers
+    )
+
+    if response.status_code != 200:
+        print(f"[DEBUG] eBay offer publication failed: {response.text}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Failed to publish eBay offer: {response.text}"
+        )
+
+    publish_response = response.json()
+    return publish_response.get("listingId")
+
 @router.post("/create")
 def create_listing(data: Listing, user=Depends(get_current_user)):
     if not data.marketplaces or len(data.marketplaces) == 0:
@@ -74,6 +213,23 @@ def create_listing(data: Listing, user=Depends(get_current_user)):
         )
         session.add(listing)
         session.commit()
+
+        # If eBay is selected, create the listing on eBay
+        if "eBay" in data.marketplaces:
+            try:
+                ebay_item_id = create_ebay_listing(listing, user)
+                listing.ebay_item_id = ebay_item_id
+                marketplace_status["eBay"] = "posted"
+                listing.marketplace_status = json.dumps(marketplace_status)
+                session.add(listing)
+                session.commit()
+            except Exception as e:
+                marketplace_status["eBay"] = "failed"
+                listing.marketplace_status = json.dumps(marketplace_status)
+                session.add(listing)
+                session.commit()
+                print(f"[DEBUG] Failed to create eBay listing: {str(e)}")
+
         return {"id": listing.id, "message": "Listing created"}
 
 

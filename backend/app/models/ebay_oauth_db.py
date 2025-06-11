@@ -9,4 +9,7 @@ class EbayOAuth(SQLModel, table=True):
     refresh_token: str
     expires_at: datetime
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow) 
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    fulfillment_policy_id: Optional[str] = None
+    payment_policy_id: Optional[str] = None
+    return_policy_id: Optional[str] = None 
