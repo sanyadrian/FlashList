@@ -89,29 +89,44 @@ async def fetch_and_store_ebay_policy_ids(user: str, token: str):
     
     try:
         # Fetch fulfillment policy
+        print("[DEBUG] Fetching fulfillment policies...")
         r = requests.get(fulfillment_url, headers=headers)
+        print(f"[DEBUG] Fulfillment policy response status: {r.status_code}")
+        print(f"[DEBUG] Fulfillment policy response: {r.text}")
         if r.status_code == 200:
             policies = r.json().get("fulfillmentPolicies", [])
+            print(f"[DEBUG] Found {len(policies)} fulfillment policies")
             if policies:
                 fulfillment_policy_id = policies[0]["fulfillmentPolicyId"]
+                print(f"[DEBUG] Using fulfillment policy ID: {fulfillment_policy_id}")
             else:
                 print("[DEBUG] No fulfillment policies found for user")
         
         # Fetch payment policy
+        print("[DEBUG] Fetching payment policies...")
         r = requests.get(payment_url, headers=headers)
+        print(f"[DEBUG] Payment policy response status: {r.status_code}")
+        print(f"[DEBUG] Payment policy response: {r.text}")
         if r.status_code == 200:
             policies = r.json().get("paymentPolicies", [])
+            print(f"[DEBUG] Found {len(policies)} payment policies")
             if policies:
                 payment_policy_id = policies[0]["paymentPolicyId"]
+                print(f"[DEBUG] Using payment policy ID: {payment_policy_id}")
             else:
                 print("[DEBUG] No payment policies found for user")
         
         # Fetch return policy
+        print("[DEBUG] Fetching return policies...")
         r = requests.get(return_url, headers=headers)
+        print(f"[DEBUG] Return policy response status: {r.status_code}")
+        print(f"[DEBUG] Return policy response: {r.text}")
         if r.status_code == 200:
             policies = r.json().get("returnPolicies", [])
+            print(f"[DEBUG] Found {len(policies)} return policies")
             if policies:
                 return_policy_id = policies[0]["returnPolicyId"]
+                print(f"[DEBUG] Using return policy ID: {return_policy_id}")
             else:
                 print("[DEBUG] No return policies found for user")
                 
@@ -141,7 +156,7 @@ async def fetch_and_store_ebay_policy_ids(user: str, token: str):
             missing_policies.append("return")
         raise HTTPException(
             status_code=400,
-            detail=f"Missing required eBay business policies: {', '.join(missing_policies)}. Please create these policies in your eBay Seller Hub first."
+            detail=f"Missing required eBay business policies: {', '.join(missing_policies)}. Please create these policies in your eBay Seller Hub first. Make sure they are active and set for the US marketplace."
         )
 
 @router.get("/callback")
