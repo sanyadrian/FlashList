@@ -23,7 +23,7 @@ EBAY_CLIENT_SECRET = os.getenv("EBAY_CLIENT_SECRET")
 EBAY_REDIRECT_URI = os.getenv("EBAY_REDIRECT_URI")
 EBAY_AUTH_URL = "https://auth.ebay.com/oauth2/authorize"
 EBAY_TOKEN_URL = "https://api.ebay.com/identity/v1/oauth2/token"
-EBAY_SCOPE = "https://api.ebay.com/oauth/api_scope/sell.inventory"
+EBAY_SCOPE = "https://api.ebay.com/oauth/api_scope/sell.inventory https://api.ebay.com/oauth/api_scope/sell.account"
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
