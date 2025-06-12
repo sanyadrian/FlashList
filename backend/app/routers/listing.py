@@ -54,141 +54,122 @@ class EbayNotificationRequest(BaseModel):
     metadata: Dict[str, Any]
     notification: EbayNotification
 
-async def create_ebay_listing(listing: DBListing, user: str) -> str:
+async def create_ebay_listing(listing: Listing, user: str):
     """
-    Create a listing on eBay using the Inventory API.
-    Returns the eBay item ID if successful, raises an exception if not.
+    Create a new listing in both our database and eBay.
     """
-    # Get eBay token and policy IDs
+    # Get eBay token
+    token = await get_ebay_token(user)
+    if not token:
+        raise HTTPException(status_code=401, detail="eBay authentication required")
+
+    # Get policy IDs from database
     with get_session() as session:
         token_record = session.query(EbayOAuth).filter(EbayOAuth.user_id == user).first()
         if not token_record:
-            raise HTTPException(status_code=401, detail="No valid eBay token found")
+            raise HTTPException(status_code=401, detail="eBay authentication required")
         
-        token = token_record.access_token
-        fulfillment_policy_id = token_record.fulfillment_policy_id
-        payment_policy_id = token_record.payment_policy_id
-        return_policy_id = token_record.return_policy_id
+        # Check if we have all required policies
+        if not all([token_record.fulfillment_policy_id, token_record.payment_policy_id, token_record.return_policy_id]):
+            missing_policies = []
+            if not token_record.fulfillment_policy_id:
+                missing_policies.append("fulfillment")
+            if not token_record.payment_policy_id:
+                missing_policies.append("payment")
+            if not token_record.return_policy_id:
+                missing_policies.append("return")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Missing required eBay business policies: {', '.join(missing_policies)}. Please create these policies in your eBay Seller Hub first."
+            )
 
-        if not all([fulfillment_policy_id, payment_policy_id, return_policy_id]):
-            # Try to create policies if they don't exist
-            try:
-                policies = await create_ebay_policies(user, token)
-                fulfillment_policy_id = policies["fulfillmentPolicyId"]
-                payment_policy_id = policies["paymentPolicyId"]
-                return_policy_id = policies["returnPolicyId"]
-            except Exception as e:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Failed to create eBay business policies: {str(e)}"
-                )
-
-    # Prepare the inventory item
+    # Create inventory item
     inventory_item = {
         "product": {
             "title": listing.title,
             "description": listing.description,
             "aspects": {
-                "Category": [listing.category],
-                "Tags": listing.tags.split(",")
+                "Brand": [listing.brand],
+                "Model": [listing.model],
+                "Year": [str(listing.year)]
             },
-            "imageUrls": [f"https://{BUCKET_NAME}.s3.{REGION}.amazonaws.com/{img}" for img in listing.image_filenames.split(",")]
-        },
-        "condition": "NEW",
-        "packageWeightAndSize": {
-            "weight": {
-                "value": 1,
-                "unit": "POUND"
-            }
-        },
-        "availability": {
-            "shipToLocationAvailability": {
-                "quantity": 1
-            }
-        },
-        "price": {
-            "value": str(listing.price),
-            "currency": "USD"
+            "imageUrls": listing.images
         }
     }
 
-    # Create inventory item
-    inventory_url = "https://api.ebay.com/sell/inventory/v1/inventory_item"
     headers = {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json"
     }
 
-    response = requests.post(
-        inventory_url,
-        json=inventory_item,
-        headers=headers
-    )
+    # Create inventory item
+    inventory_url = "https://api.ebay.com/sell/inventory/v1/inventory_item"
+    response = requests.post(inventory_url, json=inventory_item, headers=headers)
+    if response.status_code != 201:
+        print(f"[DEBUG] Failed to create inventory item: {response.text}")
+        raise HTTPException(status_code=400, detail=f"Failed to create eBay inventory item: {response.text}")
 
-    if response.status_code != 200:
-        print(f"[DEBUG] eBay inventory creation failed: {response.text}")
-        raise HTTPException(
-            status_code=400,
-            detail=f"Failed to create eBay listing: {response.text}"
-        )
-
-    inventory_response = response.json()
-    sku = inventory_response.get("sku")
+    inventory_item_id = response.json()["inventoryItemId"]
 
     # Create offer
     offer = {
-        "sku": sku,
+        "sku": str(uuid.uuid4()),
         "marketplaceId": "EBAY_US",
         "format": "FIXED_PRICE",
         "availableQuantity": 1,
-        "categoryId": "9355",  # Default category, should be mapped properly
+        "categoryId": "177009",
         "listingDescription": listing.description,
         "listingPolicies": {
-            "fulfillmentPolicyId": fulfillment_policy_id,
-            "paymentPolicyId": payment_policy_id,
-            "returnPolicyId": return_policy_id
+            "fulfillmentPolicyId": token_record.fulfillment_policy_id,
+            "paymentPolicyId": token_record.payment_policy_id,
+            "returnPolicyId": token_record.return_policy_id
         },
         "pricingSummary": {
             "price": {
                 "value": str(listing.price),
                 "currency": "USD"
             }
-        }
+        },
+        "merchantLocationKey": "LOCATION_1",
+        "inventoryItemId": inventory_item_id
     }
 
+    # Create offer
     offer_url = "https://api.ebay.com/sell/inventory/v1/offer"
-    response = requests.post(
-        offer_url,
-        json=offer,
-        headers=headers
-    )
+    response = requests.post(offer_url, json=offer, headers=headers)
+    if response.status_code != 201:
+        print(f"[DEBUG] Failed to create offer: {response.text}")
+        raise HTTPException(status_code=400, detail=f"Failed to create eBay offer: {response.text}")
 
-    if response.status_code != 200:
-        print(f"[DEBUG] eBay offer creation failed: {response.text}")
-        raise HTTPException(
-            status_code=400,
-            detail=f"Failed to create eBay offer: {response.text}"
-        )
-
-    offer_response = response.json()
-    offer_id = offer_response.get("offerId")
+    offer_id = response.json()["offerId"]
 
     # Publish offer
     publish_url = f"https://api.ebay.com/sell/inventory/v1/offer/{offer_id}/publish"
-    response = requests.post(
-        publish_url,
-        headers=headers
+    response = requests.post(publish_url, headers=headers)
+    if response.status_code != 200:
+        print(f"[DEBUG] Failed to publish offer: {response.text}")
+        raise HTTPException(status_code=400, detail=f"Failed to publish eBay offer: {response.text}")
+
+    # Create listing in our database
+    db_listing = Listing(
+        id=str(uuid.uuid4()),
+        user_id=user,
+        title=listing.title,
+        description=listing.description,
+        price=listing.price,
+        brand=listing.brand,
+        model=listing.model,
+        year=listing.year,
+        images=listing.images,
+        ebay_listing_id=offer_id
     )
 
-    if response.status_code != 200:
-        print(f"[DEBUG] eBay offer publication failed: {response.text}")
-        raise HTTPException(
-            status_code=400,
-            detail=f"Failed to publish eBay offer: {response.text}"
-        )
+    with get_session() as session:
+        session.add(db_listing)
+        session.commit()
+        session.refresh(db_listing)
 
-    publish_response = response.json()
-    return publish_response.get("listingId")
+    return db_listing
 
 @router.post("/create")
 async def create_listing(data: Listing, user=Depends(get_current_user)):
@@ -217,7 +198,7 @@ async def create_listing(data: Listing, user=Depends(get_current_user)):
         # If eBay is selected, create the listing on eBay
         if "eBay" in data.marketplaces:
             try:
-                ebay_item_id = await create_ebay_listing(listing, user)
+                ebay_item_id = await create_ebay_listing(data, user)
                 listing.ebay_item_id = ebay_item_id
                 marketplace_status["eBay"] = "posted"
                 listing.marketplace_status = json.dumps(marketplace_status)

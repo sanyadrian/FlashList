@@ -72,105 +72,10 @@ async def start_oauth(token: str = Query(None)):
     print(f"[DEBUG] Redirecting to eBay OAuth URL: {auth_url}")
     return RedirectResponse(url=auth_url)
 
-async def create_ebay_policies(user: str, token: str) -> dict:
-    """
-    Create eBay business policies (fulfillment, payment, and return policies).
-    Returns a dictionary with policy IDs.
-    """
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json"
-    }
-
-    # Create fulfillment policy
-    fulfillment_policy = {
-        "name": "Standard Fulfillment Policy",
-        "marketplaceId": "EBAY_US",
-        "categoryTypes": [{"name": "ALL_EXCLUDING_MOTORS_VEHICLES"}],
-        "handlingTime": {
-            "value": 1,
-            "unit": "DAY"
-        },
-        "shippingOptions": [{
-            "costType": "FLAT_RATE",
-            "optionType": "DOMESTIC",
-            "shippingServices": [{
-                "buyerResponsibleForShipping": False,
-                "buyerResponsibleForPickup": False,
-                "freeShipping": False,
-                "shippingCarrierCode": "USPS",
-                "shippingServiceCode": "USPSPriority",
-                "shippingCost": {
-                    "value": "0.00",
-                    "currency": "USD"
-                }
-            }]
-        }]
-    }
-
-    fulfillment_url = "https://api.ebay.com/sell/account/v1/fulfillment_policy"
-    response = requests.post(fulfillment_url, json=fulfillment_policy, headers=headers)
-    if response.status_code != 201:
-        print(f"[DEBUG] Failed to create fulfillment policy: {response.text}")
-        raise HTTPException(status_code=400, detail="Failed to create fulfillment policy")
-    fulfillment_policy_id = response.json()["fulfillmentPolicyId"]
-
-    # Create payment policy
-    payment_policy = {
-        "name": "Standard Payment Policy",
-        "marketplaceId": "EBAY_US",
-        "categoryTypes": [{"name": "ALL_EXCLUDING_MOTORS_VEHICLES"}],
-        "immediatePay": True,
-        "paymentMethods": ["CREDIT_CARD", "PAYPAL"]
-    }
-
-    payment_url = "https://api.ebay.com/sell/account/v1/payment_policy"
-    response = requests.post(payment_url, json=payment_policy, headers=headers)
-    if response.status_code != 201:
-        print(f"[DEBUG] Failed to create payment policy: {response.text}")
-        raise HTTPException(status_code=400, detail="Failed to create payment policy")
-    payment_policy_id = response.json()["paymentPolicyId"]
-
-    # Create return policy
-    return_policy = {
-        "name": "Standard Return Policy",
-        "marketplaceId": "EBAY_US",
-        "categoryTypes": [{"name": "ALL_EXCLUDING_MOTORS_VEHICLES"}],
-        "returnsAccepted": True,
-        "returnPeriod": {
-            "value": 30,
-            "unit": "DAY"
-        },
-        "returnShippingCostPayer": "SELLER",
-        "refundMethod": "MONEY_BACK"
-    }
-
-    return_url = "https://api.ebay.com/sell/account/v1/return_policy"
-    response = requests.post(return_url, json=return_policy, headers=headers)
-    if response.status_code != 201:
-        print(f"[DEBUG] Failed to create return policy: {response.text}")
-        raise HTTPException(status_code=400, detail="Failed to create return policy")
-    return_policy_id = response.json()["returnPolicyId"]
-
-    # Store policy IDs in database
-    with get_session() as session:
-        token_record = session.query(EbayOAuth).filter(EbayOAuth.user_id == user).first()
-        if token_record:
-            token_record.fulfillment_policy_id = fulfillment_policy_id
-            token_record.payment_policy_id = payment_policy_id
-            token_record.return_policy_id = return_policy_id
-            session.add(token_record)
-            session.commit()
-
-    return {
-        "fulfillmentPolicyId": fulfillment_policy_id,
-        "paymentPolicyId": payment_policy_id,
-        "returnPolicyId": return_policy_id
-    }
-
 async def fetch_and_store_ebay_policy_ids(user: str, token: str):
     """
     Fetch the user's first fulfillment, payment, and return policy IDs from eBay and store them in the EbayOAuth record.
+    If no policies exist, store None values.
     """
     headers = {
         "Authorization": f"Bearer {token}",
@@ -181,24 +86,39 @@ async def fetch_and_store_ebay_policy_ids(user: str, token: str):
     payment_url = "https://api.ebay.com/sell/account/v1/payment_policy?marketplace_id=EBAY_US"
     return_url = "https://api.ebay.com/sell/account/v1/return_policy?marketplace_id=EBAY_US"
     fulfillment_policy_id = payment_policy_id = return_policy_id = None
+    
     try:
+        # Fetch fulfillment policy
         r = requests.get(fulfillment_url, headers=headers)
         if r.status_code == 200:
             policies = r.json().get("fulfillmentPolicies", [])
             if policies:
                 fulfillment_policy_id = policies[0]["fulfillmentPolicyId"]
+            else:
+                print("[DEBUG] No fulfillment policies found for user")
+        
+        # Fetch payment policy
         r = requests.get(payment_url, headers=headers)
         if r.status_code == 200:
             policies = r.json().get("paymentPolicies", [])
             if policies:
                 payment_policy_id = policies[0]["paymentPolicyId"]
+            else:
+                print("[DEBUG] No payment policies found for user")
+        
+        # Fetch return policy
         r = requests.get(return_url, headers=headers)
         if r.status_code == 200:
             policies = r.json().get("returnPolicies", [])
             if policies:
                 return_policy_id = policies[0]["returnPolicyId"]
+            else:
+                print("[DEBUG] No return policies found for user")
+                
     except Exception as e:
         print(f"[DEBUG] Exception fetching eBay policies: {e}")
+    
+    # Store the results (even if None)
     with get_session() as session:
         token_record = session.query(EbayOAuth).filter(EbayOAuth.user_id == user).first()
         if token_record:
@@ -207,7 +127,22 @@ async def fetch_and_store_ebay_policy_ids(user: str, token: str):
             token_record.return_policy_id = return_policy_id
             session.add(token_record)
             session.commit()
+    
     print(f"[DEBUG] Stored eBay policy IDs: {fulfillment_policy_id}, {payment_policy_id}, {return_policy_id}")
+    
+    # If any policy is missing, raise an exception
+    if not all([fulfillment_policy_id, payment_policy_id, return_policy_id]):
+        missing_policies = []
+        if not fulfillment_policy_id:
+            missing_policies.append("fulfillment")
+        if not payment_policy_id:
+            missing_policies.append("payment")
+        if not return_policy_id:
+            missing_policies.append("return")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Missing required eBay business policies: {', '.join(missing_policies)}. Please create these policies in your eBay Seller Hub first."
+        )
 
 @router.get("/callback")
 async def oauth_callback(
