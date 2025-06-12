@@ -18,7 +18,7 @@ import os
 from dotenv import load_dotenv
 import hashlib
 import requests
-from app.routers.ebay_oauth import get_ebay_token, create_ebay_policies
+from app.routers.ebay_oauth import get_ebay_token
 from app.models.ebay_oauth_db import EbayOAuth
 
 load_dotenv()
