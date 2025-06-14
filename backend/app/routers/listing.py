@@ -89,9 +89,9 @@ async def create_ebay_listing(listing: Listing, user: str):
             "title": listing.title,
             "description": listing.description,
             "aspects": {
-                "Brand": [listing.brand],
-                "Model": [listing.model],
-                "Year": [str(listing.year)]
+                **({"Brand": [listing.brand]} if listing.brand else {}),
+                "Condition": ["New"],
+                "Type": ["Fixed Price"]
             },
             "imageUrls": listing.images
         }

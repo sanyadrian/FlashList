@@ -11,6 +11,7 @@ class Listing(SQLModel, table=True):
     tags: str 
     image_filenames: str
     marketplaces: str
+    brand: Optional[str] = None
     marketplace_status: str = Field(default="{}")
     price: float
     created_at: datetime = Field(default_factory=datetime.utcnow)

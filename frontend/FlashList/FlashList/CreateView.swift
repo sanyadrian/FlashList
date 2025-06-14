@@ -11,6 +11,7 @@ struct Listing: Codable {
     var price: Double?
     var image_filenames: [String]?
     var marketplaces: [String]?
+    var brand: String?
 }
 
 // Helper struct for draft listing (not yet sent to backend)
