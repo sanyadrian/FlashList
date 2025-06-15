@@ -101,7 +101,8 @@ async def create_ebay_listing(listing: Listing, user: str):
                     "value": sku,
                     "type": "SKU"
                 }
-            }
+            },
+            "categoryId": "177009"  # Add category ID to product
         },
         "condition": "NEW",
         "packageWeightAndSize": {
@@ -125,20 +126,24 @@ async def create_ebay_listing(listing: Listing, user: str):
             **({"Brand": [listing.brand]} if listing.brand else {}),
             "Condition": ["New"],
             "Type": ["Fixed Price"]
-        }
+        },
+        "categoryId": "177009"  # Add category ID at root level too
     }
 
     headers = {
         "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "X-EBAY-C-MARKETPLACE-ID": "EBAY_US"  # Add marketplace ID header
     }
 
     # Create inventory item
     inventory_url = "https://api.ebay.com/sell/inventory/v1/inventory_item"
     print(f"[DEBUG] Creating inventory item with data: {json.dumps(inventory_item, indent=2)}")
+    print(f"[DEBUG] Headers: {json.dumps(headers, indent=2)}")
     response = requests.post(inventory_url, json=inventory_item, headers=headers)
     if response.status_code != 201:
         print(f"[DEBUG] Failed to create inventory item: {response.text}")
+        print(f"[DEBUG] Response headers: {dict(response.headers)}")
         raise HTTPException(status_code=400, detail=f"Failed to create eBay inventory item: {response.text}")
 
     inventory_item_id = response.json()["inventoryItemId"]
