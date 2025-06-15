@@ -110,7 +110,17 @@ async def create_ebay_listing(listing: Listing, user: str):
             },
             "brand": listing.brand if listing.brand else "Generic",
             "mpn": sku,  # Manufacturer Part Number
-            "upc": "Does not apply"  # Universal Product Code
+            "upc": "Does not apply",  # Universal Product Code
+            "aspects": {
+                "Brand": [listing.brand if listing.brand else "Generic"],
+                "Condition": ["New"],
+                "Type": ["Fixed Price"],
+                "Plant Type": ["Succulent"],
+                "Plant Form": ["Live Plant"],
+                "Growing Zone": ["4-9"],
+                "Sun Exposure": ["Full Sun"],
+                "Water Needs": ["Low"]
+            }
         },
         "condition": "NEW",
         "packageWeightAndSize": {
@@ -129,20 +139,6 @@ async def create_ebay_listing(listing: Listing, user: str):
             "shipToLocationAvailability": {
                 "quantity": 1
             }
-        },
-        "product": {
-            "title": listing.title,
-            "description": listing.description,
-            "imageUrls": image_urls,
-            "productIdentifiers": {
-                "productId": {
-                    "value": sku,
-                    "type": "SKU"
-                }
-            },
-            "brand": listing.brand if listing.brand else "Generic",
-            "mpn": sku,
-            "upc": "Does not apply"
         }
     }
 
@@ -181,7 +177,7 @@ async def create_ebay_listing(listing: Listing, user: str):
         "merchantLocationKey": "LOCATION_1",
         "inventoryItemId": inventory_item_id,
         "aspects": {
-            **({"Brand": [listing.brand]} if listing.brand else {"Brand": ["Generic"]}),
+            "Brand": [listing.brand if listing.brand else "Generic"],
             "Condition": ["New"],
             "Type": ["Fixed Price"],
             "Plant Type": ["Succulent"],
