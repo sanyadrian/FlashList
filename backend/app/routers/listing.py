@@ -86,8 +86,12 @@ async def create_ebay_listing(listing: Listing, user: str):
     # Convert image filenames to S3 URLs
     image_urls = [f"https://{BUCKET_NAME}.s3.{REGION}.amazonaws.com/{filename}" for filename in listing.image_filenames]
 
+    # Generate a unique SKU
+    sku = str(uuid.uuid4())
+
     # Create inventory item
     inventory_item = {
+        "sku": sku,
         "product": {
             "title": listing.title,
             "description": listing.description,
@@ -116,7 +120,7 @@ async def create_ebay_listing(listing: Listing, user: str):
 
     # Create offer
     offer = {
-        "sku": str(uuid.uuid4()),
+        "sku": sku,
         "marketplaceId": "EBAY_US",
         "format": "FIXED_PRICE",
         "availableQuantity": 1,
@@ -153,26 +157,7 @@ async def create_ebay_listing(listing: Listing, user: str):
         print(f"[DEBUG] Failed to publish offer: {response.text}")
         raise HTTPException(status_code=400, detail=f"Failed to publish eBay offer: {response.text}")
 
-    # Create listing in our database
-    db_listing = Listing(
-        id=str(uuid.uuid4()),
-        user_id=user,
-        title=listing.title,
-        description=listing.description,
-        price=listing.price,
-        brand=listing.brand,
-        model=listing.model,
-        year=listing.year,
-        images=listing.images,
-        ebay_listing_id=offer_id
-    )
-
-    with get_session() as session:
-        session.add(db_listing)
-        session.commit()
-        session.refresh(db_listing)
-
-    return db_listing
+    return offer_id
 
 @router.post("/create")
 async def create_listing(data: Listing, user=Depends(get_current_user)):
