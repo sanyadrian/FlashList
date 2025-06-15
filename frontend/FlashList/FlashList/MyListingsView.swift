@@ -106,15 +106,15 @@ struct ListingRowView: View {
             if let firstImage = listing.image_filenames.first {
                 let s3URL = "https://flashlist-images.s3.us-east-2.amazonaws.com/\(firstImage)"
                 if let url = URL(string: s3URL) {
-                    AsyncImage(url: url) { image in
-                        image
-                            .resizable()
-                            .scaledToFill()
-                    } placeholder: {
-                        Color.gray
-                    }
-                    .frame(width: 60, height: 60)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                AsyncImage(url: url) { image in
+                    image
+                        .resizable()
+                        .scaledToFill()
+                } placeholder: {
+                    Color.gray
+                }
+                .frame(width: 60, height: 60)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
             }
             

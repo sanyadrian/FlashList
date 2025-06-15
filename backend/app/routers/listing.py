@@ -83,6 +83,9 @@ async def create_ebay_listing(listing: Listing, user: str):
                 detail=f"Missing required eBay business policies: {', '.join(missing_policies)}. Please create these policies in your eBay Seller Hub first."
             )
 
+    # Convert image filenames to S3 URLs
+    image_urls = [f"https://{BUCKET_NAME}.s3.{REGION}.amazonaws.com/{filename}" for filename in listing.image_filenames]
+
     # Create inventory item
     inventory_item = {
         "product": {
@@ -93,7 +96,7 @@ async def create_ebay_listing(listing: Listing, user: str):
                 "Condition": ["New"],
                 "Type": ["Fixed Price"]
             },
-            "imageUrls": listing.images
+            "imageUrls": image_urls
         }
     }
 
