@@ -89,7 +89,13 @@ async def create_ebay_listing(listing: Listing, user: str):
     # Generate a unique SKU
     sku = str(uuid.uuid4())
 
-    # Create inventory item
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+        "X-EBAY-C-MARKETPLACE-ID": "EBAY_US"
+    }
+
+    # First, create the inventory item
     inventory_item = {
         "sku": sku,
         "product": {
@@ -120,35 +126,13 @@ async def create_ebay_listing(listing: Listing, user: str):
             "shipToLocationAvailability": {
                 "quantity": 1
             }
-        },
-        "aspects": {
-            **({"Brand": [listing.brand]} if listing.brand else {}),
-            "Condition": ["New"],
-            "Type": ["Fixed Price"],
-            "Plant Type": ["Succulent"],
-            "Plant Form": ["Live Plant"],
-            "Growing Zone": ["4-9"],
-            "Sun Exposure": ["Full Sun"],
-            "Water Needs": ["Low"]
-        },
-        "categoryId": "177009"
-    }
-
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json",
-        "X-EBAY-C-MARKETPLACE-ID": "EBAY_US"
+        }
     }
 
     # Create inventory item
     inventory_url = "https://api.ebay.com/sell/inventory/v1/inventory_item"
     print(f"[DEBUG] Creating inventory item with data: {json.dumps(inventory_item, indent=2)}")
     print(f"[DEBUG] Headers: {json.dumps(headers, indent=2)}")
-    
-    # First, try to get the category tree to verify the category
-    category_url = "https://api.ebay.com/sell/inventory/v1/get_default_category_tree_id"
-    category_response = requests.get(category_url, headers=headers)
-    print(f"[DEBUG] Category tree response: {category_response.text}")
     
     response = requests.post(inventory_url, json=inventory_item, headers=headers)
     if response.status_code != 201:
@@ -164,7 +148,7 @@ async def create_ebay_listing(listing: Listing, user: str):
         "marketplaceId": "EBAY_US",
         "format": "FIXED_PRICE",
         "availableQuantity": 1,
-        "categoryId": "177009",
+        "categoryId": "177009",  # Plants & Seeds category
         "listingDescription": listing.description,
         "listingPolicies": {
             "fulfillmentPolicyId": token_record.fulfillment_policy_id,
@@ -178,7 +162,17 @@ async def create_ebay_listing(listing: Listing, user: str):
             }
         },
         "merchantLocationKey": "LOCATION_1",
-        "inventoryItemId": inventory_item_id
+        "inventoryItemId": inventory_item_id,
+        "aspects": {
+            **({"Brand": [listing.brand]} if listing.brand else {}),
+            "Condition": ["New"],
+            "Type": ["Fixed Price"],
+            "Plant Type": ["Succulent"],
+            "Plant Form": ["Live Plant"],
+            "Growing Zone": ["4-9"],
+            "Sun Exposure": ["Full Sun"],
+            "Water Needs": ["Low"]
+        }
     }
 
     # Create offer
