@@ -95,12 +95,13 @@ async def create_ebay_listing(listing: Listing, user: str):
         "product": {
             "title": listing.title,
             "description": listing.description,
-            "aspects": {
-                **({"Brand": [listing.brand]} if listing.brand else {}),
-                "Condition": ["New"],
-                "Type": ["Fixed Price"]
-            },
-            "imageUrls": image_urls
+            "imageUrls": image_urls,
+            "productIdentifiers": {
+                "productId": {
+                    "value": sku,
+                    "type": "SKU"
+                }
+            }
         },
         "condition": "NEW",
         "packageWeightAndSize": {
@@ -119,6 +120,11 @@ async def create_ebay_listing(listing: Listing, user: str):
             "shipToLocationAvailability": {
                 "quantity": 1
             }
+        },
+        "aspects": {
+            **({"Brand": [listing.brand]} if listing.brand else {}),
+            "Condition": ["New"],
+            "Type": ["Fixed Price"]
         }
     }
 
