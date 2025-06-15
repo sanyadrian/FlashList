@@ -142,18 +142,19 @@ async def create_ebay_listing(listing: Listing, user: str):
         }
     }
 
-    # Create inventory item
-    inventory_url = "https://api.ebay.com/sell/inventory/v1/inventory_item"
+    # Create inventory item using PUT to the correct URL with SKU
+    inventory_url = f"https://api.ebay.com/sell/inventory/v1/inventory_item/{sku}"
     print(f"[DEBUG] Creating inventory item with data: {json.dumps(inventory_item, indent=2)}")
     print(f"[DEBUG] Headers: {json.dumps(headers, indent=2)}")
     
-    response = requests.post(inventory_url, json=inventory_item, headers=headers)
-    if response.status_code != 201:
+    response = requests.put(inventory_url, json=inventory_item, headers=headers)
+    if response.status_code not in (200, 201):
         print(f"[DEBUG] Failed to create inventory item: {response.text}")
         print(f"[DEBUG] Response headers: {dict(response.headers)}")
         raise HTTPException(status_code=400, detail=f"Failed to create eBay inventory item: {response.text}")
 
-    inventory_item_id = response.json()["inventoryItemId"]
+    # eBay does not return inventoryItemId, use sku
+    inventory_item_id = sku
 
     # Create offer
     offer = {
