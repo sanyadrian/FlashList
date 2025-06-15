@@ -101,6 +101,24 @@ async def create_ebay_listing(listing: Listing, user: str):
                 "Type": ["Fixed Price"]
             },
             "imageUrls": image_urls
+        },
+        "condition": "NEW",
+        "packageWeightAndSize": {
+            "dimensions": {
+                "height": 1,
+                "length": 1,
+                "width": 1,
+                "unit": "INCH"
+            },
+            "weight": {
+                "value": 1,
+                "unit": "POUND"
+            }
+        },
+        "availability": {
+            "shipToLocationAvailability": {
+                "quantity": 1
+            }
         }
     }
 
@@ -111,6 +129,7 @@ async def create_ebay_listing(listing: Listing, user: str):
 
     # Create inventory item
     inventory_url = "https://api.ebay.com/sell/inventory/v1/inventory_item"
+    print(f"[DEBUG] Creating inventory item with data: {json.dumps(inventory_item, indent=2)}")
     response = requests.post(inventory_url, json=inventory_item, headers=headers)
     if response.status_code != 201:
         print(f"[DEBUG] Failed to create inventory item: {response.text}")
