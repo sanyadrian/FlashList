@@ -107,7 +107,10 @@ async def create_ebay_listing(listing: Listing, user: str):
                     "value": sku,
                     "type": "SKU"
                 }
-            }
+            },
+            "brand": listing.brand if listing.brand else "Generic",
+            "mpn": sku,  # Manufacturer Part Number
+            "upc": "Does not apply"  # Universal Product Code
         },
         "condition": "NEW",
         "packageWeightAndSize": {
@@ -126,6 +129,20 @@ async def create_ebay_listing(listing: Listing, user: str):
             "shipToLocationAvailability": {
                 "quantity": 1
             }
+        },
+        "product": {
+            "title": listing.title,
+            "description": listing.description,
+            "imageUrls": image_urls,
+            "productIdentifiers": {
+                "productId": {
+                    "value": sku,
+                    "type": "SKU"
+                }
+            },
+            "brand": listing.brand if listing.brand else "Generic",
+            "mpn": sku,
+            "upc": "Does not apply"
         }
     }
 
@@ -164,7 +181,7 @@ async def create_ebay_listing(listing: Listing, user: str):
         "merchantLocationKey": "LOCATION_1",
         "inventoryItemId": inventory_item_id,
         "aspects": {
-            **({"Brand": [listing.brand]} if listing.brand else {}),
+            **({"Brand": [listing.brand]} if listing.brand else {"Brand": ["Generic"]}),
             "Condition": ["New"],
             "Type": ["Fixed Price"],
             "Plant Type": ["Succulent"],
@@ -177,6 +194,7 @@ async def create_ebay_listing(listing: Listing, user: str):
 
     # Create offer
     offer_url = "https://api.ebay.com/sell/inventory/v1/offer"
+    print(f"[DEBUG] Creating offer with data: {json.dumps(offer, indent=2)}")
     response = requests.post(offer_url, json=offer, headers=headers)
     if response.status_code != 201:
         print(f"[DEBUG] Failed to create offer: {response.text}")
