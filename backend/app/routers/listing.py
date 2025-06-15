@@ -110,7 +110,6 @@ async def create_ebay_listing(listing: Listing, user: str):
             },
             "brand": listing.brand if listing.brand else "Generic",
             "mpn": sku,  # Manufacturer Part Number
-            "upc": "Does not apply",  # Universal Product Code
             "aspects": {
                 "Brand": [listing.brand if listing.brand else "Generic"],
                 "Condition": ["New"],
