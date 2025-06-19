@@ -92,7 +92,8 @@ async def create_ebay_listing(listing: Listing, user: str):
     headers = {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json",
-        "X-EBAY-C-MARKETPLACE-ID": "EBAY_US"
+        "X-EBAY-C-MARKETPLACE-ID": "EBAY_US",
+        "Content-Language": "en-US"
     }
 
     # First, create the inventory item
