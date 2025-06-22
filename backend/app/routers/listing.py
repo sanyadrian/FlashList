@@ -120,7 +120,8 @@ async def create_ebay_listing(listing: Listing, user: str):
             "mpn": sku,  # Manufacturer Part Number
             "aspects": {
                 "Brand": [listing.brand if listing.brand else "Generic"],
-                "Condition": ["New"]
+                "Condition": ["New"],
+                "Country/Region of Manufacture": ["United States"]
             }
         },
         "condition": "NEW",
@@ -212,7 +213,7 @@ async def create_ebay_listing(listing: Listing, user: str):
             "Condition": ["New"],
             "Country/Region of Manufacture": ["United States"]
         },
-        "country": "US"
+        "locale": "en-US"
     }
     
     # Add location if available
