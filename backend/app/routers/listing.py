@@ -153,7 +153,7 @@ async def create_ebay_listing(listing: Listing, user: str):
     for attempt in range(max_retries):
         try:
             response = requests.put(inventory_url, json=inventory_item, headers=headers, timeout=30)
-            if response.status_code in (200, 201):
+            if response.status_code in (200, 201, 204):  # 204 means success with no content
                 break
             elif response.status_code == 500 and attempt < max_retries - 1:
                 print(f"[DEBUG] eBay API returned 500, retrying... (attempt {attempt + 1}/{max_retries})")
@@ -171,7 +171,7 @@ async def create_ebay_listing(listing: Listing, user: str):
             else:
                 raise HTTPException(status_code=500, detail=f"Failed to connect to eBay API: {str(e)}")
     
-    if response.status_code not in (200, 201):
+    if response.status_code not in (200, 201, 204):
         print(f"[DEBUG] Failed to create inventory item: {response.text}")
         print(f"[DEBUG] Response headers: {dict(response.headers)}")
         print(f"[DEBUG] Response status: {response.status_code}")
