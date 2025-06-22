@@ -186,6 +186,12 @@ async def create_ebay_listing(listing: Listing, user: str):
     # Get or create merchant location
     merchant_location = await get_or_create_merchant_location(token)
 
+    if not merchant_location:
+        raise HTTPException(
+            status_code=400,
+            detail="No merchant location available. Please create a location in your eBay Seller Hub first, then try again."
+        )
+
     # Create offer
     offer = {
         "sku": sku,
@@ -208,10 +214,10 @@ async def create_ebay_listing(listing: Listing, user: str):
         },
         "quantityLimitPerBuyer": 1,
         "includeCatalogProductDetails": True,
-        "merchantLocationKey": merchant_location or "LOCATION_1"
+        "merchantLocationKey": merchant_location
     }
     
-    print(f"[DEBUG] Using merchant location: {merchant_location or 'LOCATION_1'}")
+    print(f"[DEBUG] Using merchant location: {merchant_location}")
 
     # Create offer
     offer_url = "https://api.ebay.com/sell/inventory/v1/offer"
@@ -518,49 +524,71 @@ async def get_or_create_merchant_location(token: str) -> str:
             timeout=30
         )
         
+        print(f"[DEBUG] Location fetch response status: {response.status_code}")
+        print(f"[DEBUG] Location fetch response: {response.text}")
+        
         if response.status_code == 200:
             locations = response.json().get("locations", [])
+            print(f"[DEBUG] Found {len(locations)} existing locations")
             if locations:
-                print(f"[DEBUG] Found existing location: {locations[0]['locationKey']}")
-                return locations[0]["locationKey"]
+                location_key = locations[0]["locationKey"]
+                print(f"[DEBUG] Using existing location: {location_key}")
+                return location_key
     except Exception as e:
         print(f"[DEBUG] Exception fetching locations: {e}")
     
     # Try to create a basic location if none exists
     print("[DEBUG] No locations found, attempting to create basic location...")
-    location_data = {
-        "locationKey": "LOCATION_1",
-        "location": {
-            "address": {
-                "addressLine1": "123 Main St",
-                "city": "New York",
-                "stateOrProvince": "NY",
-                "postalCode": "10001",
-                "country": "US"
-            }
-        },
-        "phone": "555-123-4567"
-    }
     
-    try:
-        response = requests.post(
-            "https://api.ebay.com/sell/inventory/v1/location",
-            json=location_data,
-            headers=headers,
-            timeout=30
-        )
+    # Try different location data structures
+    location_attempts = [
+        {
+            "locationKey": "LOCATION_1",
+            "location": {
+                "address": {
+                    "addressLine1": "123 Main St",
+                    "city": "New York",
+                    "stateOrProvince": "NY",
+                    "postalCode": "10001",
+                    "country": "US"
+                }
+            },
+            "phone": "555-123-4567"
+        },
+        {
+            "locationKey": "LOCATION_1",
+            "location": {
+                "address": {
+                    "addressLine1": "123 Main St",
+                    "city": "New York",
+                    "stateOrProvince": "NY",
+                    "postalCode": "10001",
+                    "country": "US"
+                }
+            }
+        }
+    ]
+    
+    for i, location_data in enumerate(location_attempts):
+        print(f"[DEBUG] Trying location creation attempt {i+1} with data: {json.dumps(location_data, indent=2)}")
         
-        print(f"[DEBUG] Location creation response status: {response.status_code}")
-        print(f"[DEBUG] Location creation response: {response.text}")
-        
-        if response.status_code == 201:
-            print("[DEBUG] Basic merchant location created successfully")
-            return "LOCATION_1"
-        else:
-            print(f"[DEBUG] Failed to create location: {response.status_code} - {response.text}")
-            print("[DEBUG] Using default location key as fallback")
-            return "LOCATION_1"  # Try using this as a fallback
-    except Exception as e:
-        print(f"[DEBUG] Exception creating location: {e}")
-        print("[DEBUG] Using default location key as fallback")
-        return "LOCATION_1"  # Try using this as a fallback
+        try:
+            response = requests.post(
+                "https://api.ebay.com/sell/inventory/v1/location",
+                json=location_data,
+                headers=headers,
+                timeout=30
+            )
+            
+            print(f"[DEBUG] Location creation attempt {i+1} response status: {response.status_code}")
+            print(f"[DEBUG] Location creation attempt {i+1} response: {response.text}")
+            
+            if response.status_code == 201:
+                print(f"[DEBUG] Location created successfully on attempt {i+1}")
+                return "LOCATION_1"
+        except Exception as e:
+            print(f"[DEBUG] Exception on location creation attempt {i+1}: {e}")
+    
+    print("[DEBUG] All location creation attempts failed")
+    print("[DEBUG] This user needs to create a location in their eBay Seller Hub first")
+    return None
