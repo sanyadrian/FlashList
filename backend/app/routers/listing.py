@@ -210,7 +210,8 @@ async def create_ebay_listing(listing: Listing, user: str):
         "aspects": {
             "Brand": [listing.brand if listing.brand else "Generic"],
             "Condition": ["New"]
-        }
+        },
+        "country": "US"  # Required when no merchant location is specified
     }
     
     # Add location if available
