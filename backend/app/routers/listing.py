@@ -199,7 +199,7 @@ async def create_ebay_listing(listing: Listing, user: str):
         "format": "FIXED_PRICE",
         "availableQuantity": 1,
         "categoryId": "11450",  # Home & Garden category
-        "title": listing.title,
+        "itemTitle": listing.title,
         "listingDescription": listing.description,
         "listingDuration": "DAYS_7",
         "listingPolicies": {
