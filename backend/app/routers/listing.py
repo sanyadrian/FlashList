@@ -185,7 +185,12 @@ async def create_ebay_listing(listing: Listing, user: str):
     # Get merchant location
     merchant_location = await get_ebay_merchant_location(token)
     if not merchant_location:
-        print("[DEBUG] No merchant location found, proceeding without location key")
+        print("[DEBUG] No merchant location found, creating default location...")
+        merchant_location = await create_default_merchant_location(token)
+        if not merchant_location:
+            print("[DEBUG] Failed to create default location, proceeding without location key")
+        else:
+            print(f"[DEBUG] Using created location: {merchant_location}")
 
     # Create offer
     offer = {
@@ -538,4 +543,114 @@ async def get_ebay_merchant_location(token: str) -> str:
             return None
     except Exception as e:
         print(f"[DEBUG] Exception fetching locations: {e}")
+        return None
+
+async def create_default_merchant_location(token: str) -> str:
+    """
+    Create a default merchant location in eBay if none exists.
+    Returns the location key.
+    """
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
+    
+    # First, check if we already have locations
+    try:
+        response = requests.get(
+            "https://api.ebay.com/sell/inventory/v1/location",
+            headers=headers,
+            timeout=30
+        )
+        
+        if response.status_code == 200:
+            locations = response.json().get("locations", [])
+            if locations:
+                return locations[0]["locationKey"]
+    except Exception as e:
+        print(f"[DEBUG] Exception checking locations: {e}")
+    
+    # Create a default location
+    location_data = {
+        "locationKey": "LOCATION_1",
+        "location": {
+            "address": {
+                "addressLine1": "123 Main St",
+                "city": "New York",
+                "stateOrProvince": "NY",
+                "postalCode": "10001",
+                "country": "US"
+            },
+            "geoCoordinates": {
+                "latitude": 40.7128,
+                "longitude": -74.0060
+            }
+        },
+        "phone": "555-123-4567",
+        "locationInstructions": "Default location for FlashList",
+        "operatingHours": [
+            {
+                "dayOfWeekEnum": "MONDAY",
+                "intervals": [
+                    {
+                        "open": "09:00:00",
+                        "close": "17:00:00"
+                    }
+                ]
+            },
+            {
+                "dayOfWeekEnum": "TUESDAY",
+                "intervals": [
+                    {
+                        "open": "09:00:00",
+                        "close": "17:00:00"
+                    }
+                ]
+            },
+            {
+                "dayOfWeekEnum": "WEDNESDAY",
+                "intervals": [
+                    {
+                        "open": "09:00:00",
+                        "close": "17:00:00"
+                    }
+                ]
+            },
+            {
+                "dayOfWeekEnum": "THURSDAY",
+                "intervals": [
+                    {
+                        "open": "09:00:00",
+                        "close": "17:00:00"
+                    }
+                ]
+            },
+            {
+                "dayOfWeekEnum": "FRIDAY",
+                "intervals": [
+                    {
+                        "open": "09:00:00",
+                        "close": "17:00:00"
+                    }
+                ]
+            }
+        ]
+    }
+    
+    try:
+        response = requests.post(
+            "https://api.ebay.com/sell/inventory/v1/location",
+            json=location_data,
+            headers=headers,
+            timeout=30
+        )
+        
+        if response.status_code == 201:
+            print("[DEBUG] Default merchant location created successfully")
+            return "LOCATION_1"
+        else:
+            print(f"[DEBUG] Failed to create location: {response.status_code} - {response.text}")
+            return None
+    except Exception as e:
+        print(f"[DEBUG] Exception creating location: {e}")
         return None
