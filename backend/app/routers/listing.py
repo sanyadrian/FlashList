@@ -548,7 +548,8 @@ async def get_or_create_merchant_location(token: str) -> str:
             "location": {
                 "address": {
                     "country": "US",
-                    "city": "New York"
+                    "city": "New York",
+                    "postalCode": "10001"
                 }
             },
             "locationTypes": [
