@@ -205,6 +205,7 @@ async def create_ebay_listing(listing: Listing, user: str):
                 }
             },
             "locationTypes": ["WAREHOUSE"],
+            "merchantLocationKey": "LOCATION_1",
             "merchantLocationStatus": "ENABLED"
         }
         
