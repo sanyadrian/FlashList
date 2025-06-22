@@ -531,7 +531,7 @@ async def get_or_create_merchant_location(token: str) -> str:
             locations = response.json().get("locations", [])
             print(f"[DEBUG] Found {len(locations)} existing locations")
             if locations:
-                location_key = locations[0]["locationKey"]
+                location_key = locations[0]["merchantLocationKey"]
                 print(f"[DEBUG] Using existing location: {location_key}")
                 return location_key
     except Exception as e:
