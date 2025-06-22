@@ -123,7 +123,8 @@ async def create_ebay_listing(listing: Listing, user: str):
                 "Condition": ["New"],
                 "Country/Region of Manufacture": ["US"]
             },
-            "country": "US"
+            "country": "US",
+            "title": listing.title
         },
         "condition": "NEW",
         "packageWeightAndSize": {
