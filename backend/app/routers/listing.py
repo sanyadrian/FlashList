@@ -141,7 +141,8 @@ async def create_ebay_listing(listing: Listing, user: str):
             "shipToLocationAvailability": {
                 "quantity": 1
             }
-        }
+        },
+        "country": "US"
     }
 
     # Create inventory item using PUT to the correct URL with SKU
@@ -213,6 +214,7 @@ async def create_ebay_listing(listing: Listing, user: str):
             "Condition": ["New"],
             "Country/Region of Manufacture": ["United States"]
         },
+        "country": "US",
         "locale": "en-US"
     }
     
