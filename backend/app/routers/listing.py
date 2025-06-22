@@ -573,7 +573,7 @@ async def get_or_create_merchant_location(token: str) -> str:
             print(f"[DEBUG] Location creation attempt {i+1} response status: {response.status_code}")
             print(f"[DEBUG] Location creation attempt {i+1} response: {response.text}")
             
-            if response.status_code == 201:
+            if response.status_code in (200, 201, 204):  # 204 means success with no content
                 print(f"[DEBUG] Location created successfully on attempt {i+1}")
                 return location_data['merchantLocationKey']
         except Exception as e:
