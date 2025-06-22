@@ -209,9 +209,10 @@ async def create_ebay_listing(listing: Listing, user: str):
         "inventoryItemId": inventory_item_id,
         "aspects": {
             "Brand": [listing.brand if listing.brand else "Generic"],
-            "Condition": ["New"]
+            "Condition": ["New"],
+            "Country/Region of Manufacture": ["United States"]
         },
-        "country": "US"  # Required when no merchant location is specified
+        "country": "US"
     }
     
     # Add location if available
