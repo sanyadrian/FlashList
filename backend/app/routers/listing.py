@@ -180,6 +180,11 @@ async def create_ebay_listing(listing: Listing, user: str):
     # eBay does not return inventoryItemId, use sku
     inventory_item_id = sku
 
+    # Get merchant location
+    merchant_location = await get_ebay_merchant_location(token)
+    if not merchant_location:
+        print("[DEBUG] No merchant location found, proceeding without location key")
+
     # Create offer
     offer = {
         "sku": sku,
@@ -201,13 +206,16 @@ async def create_ebay_listing(listing: Listing, user: str):
                 "currency": "USD"
             }
         },
-        "merchantLocationKey": "LOCATION_1",
         "inventoryItemId": inventory_item_id,
         "aspects": {
             "Brand": [listing.brand if listing.brand else "Generic"],
             "Condition": ["New"]
         }
     }
+    
+    # Add location if available
+    if merchant_location:
+        offer["merchantLocationKey"] = merchant_location
 
     # Create offer
     offer_url = "https://api.ebay.com/sell/inventory/v1/offer"
@@ -495,3 +503,34 @@ async def handle_ebay_challenge(request: Request, challenge_code: str = Query(..
         content={"challengeResponse": challenge_response},
         headers={"Content-Type": "application/json"}
     )
+
+async def get_ebay_merchant_location(token: str) -> str:
+    """
+    Get the first available merchant location from eBay.
+    Returns the location key or None if no locations are found.
+    """
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
+    
+    try:
+        response = requests.get(
+            "https://api.ebay.com/sell/inventory/v1/location",
+            headers=headers,
+            timeout=30
+        )
+        
+        if response.status_code == 200:
+            locations = response.json().get("locations", [])
+            if locations:
+                return locations[0]["locationKey"]
+            else:
+                print("[DEBUG] No merchant locations found in eBay account")
+                return None
+        else:
+            print(f"[DEBUG] Failed to fetch locations: {response.status_code} - {response.text}")
+            return None
+    except Exception as e:
+        print(f"[DEBUG] Exception fetching locations: {e}")
+        return None
