@@ -193,6 +193,7 @@ async def create_ebay_listing(listing: Listing, user: str):
         "availableQuantity": 1,
         "categoryId": "177009",  # Plants & Seeds category
         "listingDescription": listing.description,
+        "listingDuration": "DAYS_7",
         "listingPolicies": {
             "fulfillmentPolicyId": token_record.fulfillment_policy_id,
             "paymentPolicyId": token_record.payment_policy_id,
