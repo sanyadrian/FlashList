@@ -192,9 +192,7 @@ async def create_ebay_listing(listing: Listing, user: str):
         "format": "FIXED_PRICE",
         "availableQuantity": 1,
         "categoryId": "177009",  # Plants & Seeds category
-        "title": listing.title,
-        "description": listing.description,
-        "imageUrls": image_urls,
+        "listingDescription": listing.description,
         "listingPolicies": {
             "fulfillmentPolicyId": token_record.fulfillment_policy_id,
             "paymentPolicyId": token_record.payment_policy_id,
@@ -202,23 +200,20 @@ async def create_ebay_listing(listing: Listing, user: str):
         },
         "pricingSummary": {
             "price": {
-                "value": str(listing.price),
-                "currency": "USD"
+                "currency": "USD",
+                "value": str(listing.price)
             }
         },
-        "inventoryItemId": inventory_item_id,
-        "aspects": {
-            "Brand": [listing.brand if listing.brand else "Generic"],
-            "Condition": ["New"],
-            "Country/Region of Manufacture": ["US"]
-        },
-        "country": "US",
-        "locale": "en-US"
+        "quantityLimitPerBuyer": 1,
+        "includeCatalogProductDetails": True
     }
     
-    # Add location if available
+    # Add location if available (optional)
     if merchant_location:
         offer["merchantLocationKey"] = merchant_location
+        print(f"[DEBUG] Added merchant location: {merchant_location}")
+    else:
+        print("[DEBUG] No merchant location available, proceeding without location")
 
     # Create offer
     offer_url = "https://api.ebay.com/sell/inventory/v1/offer"
@@ -510,7 +505,7 @@ async def handle_ebay_challenge(request: Request, challenge_code: str = Query(..
 async def get_or_create_merchant_location(token: str) -> str:
     """
     Get the first available merchant location from eBay, or create a basic one if none exists.
-    Returns the location key.
+    Returns the location key or None if creation fails.
     """
     headers = {
         "Authorization": f"Bearer {token}",
@@ -533,8 +528,8 @@ async def get_or_create_merchant_location(token: str) -> str:
     except Exception as e:
         print(f"[DEBUG] Exception fetching locations: {e}")
     
-    # Create a basic location if none exists
-    print("[DEBUG] No locations found, creating basic location...")
+    # Try to create a basic location if none exists
+    print("[DEBUG] No locations found, attempting to create basic location...")
     location_data = {
         "locationKey": "LOCATION_1",
         "location": {
@@ -546,7 +541,8 @@ async def get_or_create_merchant_location(token: str) -> str:
                 "country": "US"
             }
         },
-        "phone": "555-123-4567"
+        "phone": "555-123-4567",
+        "locationInstructions": "Default location"
     }
     
     try:
@@ -562,7 +558,9 @@ async def get_or_create_merchant_location(token: str) -> str:
             return "LOCATION_1"
         else:
             print(f"[DEBUG] Failed to create location: {response.status_code} - {response.text}")
+            print("[DEBUG] Proceeding without merchant location")
             return None
     except Exception as e:
         print(f"[DEBUG] Exception creating location: {e}")
+        print("[DEBUG] Proceeding without merchant location")
         return None
