@@ -190,8 +190,28 @@ async def create_ebay_listing(listing: Listing, user: str):
     if not merchant_location:
         raise HTTPException(
             status_code=400,
-            detail="No merchant location available. Please create a location in your eBay Seller Hub first, then try again."
+            detail="eBay merchant location required. Please visit your eBay Seller Hub to create a location first, then try again. See /listing/ebay/setup-instructions for detailed steps."
         )
+
+    # Update existing location to include postal code if it's the default location
+    if merchant_location == "LOCATION_1":
+        print("[DEBUG] Updating existing location with postal code...")
+        update_location_data = {
+            "location": {
+                "address": {
+                    "country": "US",
+                    "city": "New York",
+                    "postalCode": "10001"
+                }
+            },
+            "locationTypes": ["WAREHOUSE"],
+            "merchantLocationStatus": "ENABLED"
+        }
+        
+        update_url = f"https://api.ebay.com/sell/inventory/v1/location/{merchant_location}"
+        response = requests.put(update_url, json=update_location_data, headers=headers)
+        print(f"[DEBUG] Location update response status: {response.status_code}")
+        print(f"[DEBUG] Location update response: {response.text}")
 
     # Create offer
     offer = {
