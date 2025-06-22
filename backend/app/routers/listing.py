@@ -83,6 +83,16 @@ async def create_ebay_listing(listing: Listing, user: str):
                 detail=f"Missing required eBay business policies: {', '.join(missing_policies)}. Please create these policies in your eBay Seller Hub first."
             )
 
+    # Validate required fields
+    if not listing.title or len(listing.title.strip()) == 0:
+        raise HTTPException(status_code=400, detail="Title is required")
+    if not listing.description or len(listing.description.strip()) == 0:
+        raise HTTPException(status_code=400, detail="Description is required")
+    if not listing.image_filenames or len(listing.image_filenames) == 0:
+        raise HTTPException(status_code=400, detail="At least one image is required")
+    if not listing.price or listing.price <= 0:
+        raise HTTPException(status_code=400, detail="Valid price is required")
+
     # Convert image filenames to S3 URLs
     image_urls = [f"https://{BUCKET_NAME}.s3.{REGION}.amazonaws.com/{filename}" for filename in listing.image_filenames]
 
@@ -100,9 +110,6 @@ async def create_ebay_listing(listing: Listing, user: str):
     inventory_item = {
         "sku": sku,
         "product": {
-            "title": listing.title,
-            "description": listing.description,
-            "imageUrls": image_urls,
             "productIdentifiers": {
                 "productId": {
                     "value": sku,
@@ -113,13 +120,7 @@ async def create_ebay_listing(listing: Listing, user: str):
             "mpn": sku,  # Manufacturer Part Number
             "aspects": {
                 "Brand": [listing.brand if listing.brand else "Generic"],
-                "Condition": ["New"],
-                "Type": ["Fixed Price"],
-                "Plant Type": ["Succulent"],
-                "Plant Form": ["Live Plant"],
-                "Growing Zone": ["4-9"],
-                "Sun Exposure": ["Full Sun"],
-                "Water Needs": ["Low"]
+                "Condition": ["New"]
             }
         },
         "condition": "NEW",
@@ -147,10 +148,33 @@ async def create_ebay_listing(listing: Listing, user: str):
     print(f"[DEBUG] Creating inventory item with data: {json.dumps(inventory_item, indent=2)}")
     print(f"[DEBUG] Headers: {json.dumps(headers, indent=2)}")
     
-    response = requests.put(inventory_url, json=inventory_item, headers=headers)
+    # Add retry logic for transient errors
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            response = requests.put(inventory_url, json=inventory_item, headers=headers, timeout=30)
+            if response.status_code in (200, 201):
+                break
+            elif response.status_code == 500 and attempt < max_retries - 1:
+                print(f"[DEBUG] eBay API returned 500, retrying... (attempt {attempt + 1}/{max_retries})")
+                import time
+                time.sleep(2 ** attempt)  # Exponential backoff
+                continue
+            else:
+                break
+        except requests.exceptions.RequestException as e:
+            if attempt < max_retries - 1:
+                print(f"[DEBUG] Request failed, retrying... (attempt {attempt + 1}/{max_retries}): {e}")
+                import time
+                time.sleep(2 ** attempt)
+                continue
+            else:
+                raise HTTPException(status_code=500, detail=f"Failed to connect to eBay API: {str(e)}")
+    
     if response.status_code not in (200, 201):
         print(f"[DEBUG] Failed to create inventory item: {response.text}")
         print(f"[DEBUG] Response headers: {dict(response.headers)}")
+        print(f"[DEBUG] Response status: {response.status_code}")
         raise HTTPException(status_code=400, detail=f"Failed to create eBay inventory item: {response.text}")
 
     # eBay does not return inventoryItemId, use sku
@@ -163,7 +187,9 @@ async def create_ebay_listing(listing: Listing, user: str):
         "format": "FIXED_PRICE",
         "availableQuantity": 1,
         "categoryId": "177009",  # Plants & Seeds category
-        "listingDescription": listing.description,
+        "title": listing.title,
+        "description": listing.description,
+        "imageUrls": image_urls,
         "listingPolicies": {
             "fulfillmentPolicyId": token_record.fulfillment_policy_id,
             "paymentPolicyId": token_record.payment_policy_id,
@@ -179,22 +205,39 @@ async def create_ebay_listing(listing: Listing, user: str):
         "inventoryItemId": inventory_item_id,
         "aspects": {
             "Brand": [listing.brand if listing.brand else "Generic"],
-            "Condition": ["New"],
-            "Type": ["Fixed Price"],
-            "Plant Type": ["Succulent"],
-            "Plant Form": ["Live Plant"],
-            "Growing Zone": ["4-9"],
-            "Sun Exposure": ["Full Sun"],
-            "Water Needs": ["Low"]
+            "Condition": ["New"]
         }
     }
 
     # Create offer
     offer_url = "https://api.ebay.com/sell/inventory/v1/offer"
     print(f"[DEBUG] Creating offer with data: {json.dumps(offer, indent=2)}")
-    response = requests.post(offer_url, json=offer, headers=headers)
+    
+    # Add retry logic for offer creation
+    for attempt in range(max_retries):
+        try:
+            response = requests.post(offer_url, json=offer, headers=headers, timeout=30)
+            if response.status_code == 201:
+                break
+            elif response.status_code == 500 and attempt < max_retries - 1:
+                print(f"[DEBUG] eBay offer API returned 500, retrying... (attempt {attempt + 1}/{max_retries})")
+                import time
+                time.sleep(2 ** attempt)
+                continue
+            else:
+                break
+        except requests.exceptions.RequestException as e:
+            if attempt < max_retries - 1:
+                print(f"[DEBUG] Offer request failed, retrying... (attempt {attempt + 1}/{max_retries}): {e}")
+                import time
+                time.sleep(2 ** attempt)
+                continue
+            else:
+                raise HTTPException(status_code=500, detail=f"Failed to connect to eBay API: {str(e)}")
+    
     if response.status_code != 201:
         print(f"[DEBUG] Failed to create offer: {response.text}")
+        print(f"[DEBUG] Response status: {response.status_code}")
         raise HTTPException(status_code=400, detail=f"Failed to create eBay offer: {response.text}")
 
     offer_id = response.json()["offerId"]

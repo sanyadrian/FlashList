@@ -475,7 +475,7 @@ struct CreateView: View {
     private func generateListing(with idx: Int) {
         isGenerating = true
         errorMessage = nil
-
+        
         guard idx >= 0 && idx < photoFilenames.count else {
             errorMessage = "Photo index out of range."
             isGenerating = false
@@ -486,7 +486,7 @@ struct CreateView: View {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
+        
         let body = ["filename": photoFilenames[idx]]
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
         
