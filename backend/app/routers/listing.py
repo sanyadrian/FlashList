@@ -543,29 +543,17 @@ async def get_or_create_merchant_location(token: str) -> str:
     # Try different location data structures
     location_attempts = [
         {
-            "locationKey": "LOCATION_1",
             "location": {
                 "address": {
-                    "addressLine1": "123 Main St",
-                    "city": "New York",
-                    "stateOrProvince": "NY",
-                    "postalCode": "10001",
-                    "country": "US"
+                    "country": "US",
+                    "city": "New York"
                 }
             },
-            "phone": "555-123-4567"
-        },
-        {
-            "locationKey": "LOCATION_1",
-            "location": {
-                "address": {
-                    "addressLine1": "123 Main St",
-                    "city": "New York",
-                    "stateOrProvince": "NY",
-                    "postalCode": "10001",
-                    "country": "US"
-                }
-            }
+            "locationTypes": [
+                "WAREHOUSE"
+            ],
+            "merchantLocationKey": "LOCATION_1",
+            "merchantLocationStatus": "ENABLED"
         }
     ]
     
