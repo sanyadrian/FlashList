@@ -207,15 +207,11 @@ async def create_ebay_listing(listing: Listing, user: str):
             }
         },
         "quantityLimitPerBuyer": 1,
-        "includeCatalogProductDetails": True
+        "includeCatalogProductDetails": True,
+        "merchantLocationKey": merchant_location or "LOCATION_1"
     }
     
-    # Add location if available (optional)
-    if merchant_location:
-        offer["merchantLocationKey"] = merchant_location
-        print(f"[DEBUG] Added merchant location: {merchant_location}")
-    else:
-        print("[DEBUG] No merchant location available, proceeding without location")
+    print(f"[DEBUG] Using merchant location: {merchant_location or 'LOCATION_1'}")
 
     # Create offer
     offer_url = "https://api.ebay.com/sell/inventory/v1/offer"
@@ -543,8 +539,7 @@ async def get_or_create_merchant_location(token: str) -> str:
                 "country": "US"
             }
         },
-        "phone": "555-123-4567",
-        "locationInstructions": "Default location"
+        "phone": "555-123-4567"
     }
     
     try:
@@ -555,14 +550,17 @@ async def get_or_create_merchant_location(token: str) -> str:
             timeout=30
         )
         
+        print(f"[DEBUG] Location creation response status: {response.status_code}")
+        print(f"[DEBUG] Location creation response: {response.text}")
+        
         if response.status_code == 201:
             print("[DEBUG] Basic merchant location created successfully")
             return "LOCATION_1"
         else:
             print(f"[DEBUG] Failed to create location: {response.status_code} - {response.text}")
-            print("[DEBUG] Proceeding without merchant location")
-            return None
+            print("[DEBUG] Using default location key as fallback")
+            return "LOCATION_1"  # Try using this as a fallback
     except Exception as e:
         print(f"[DEBUG] Exception creating location: {e}")
-        print("[DEBUG] Proceeding without merchant location")
-        return None
+        print("[DEBUG] Using default location key as fallback")
+        return "LOCATION_1"  # Try using this as a fallback
