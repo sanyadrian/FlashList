@@ -122,7 +122,8 @@ async def create_ebay_listing(listing: Listing, user: str):
                 "Brand": [listing.brand if listing.brand else "Generic"],
                 "Condition": ["New"],
                 "Country/Region of Manufacture": ["US"]
-            }
+            },
+            "country": "US"
         },
         "condition": "NEW",
         "packageWeightAndSize": {
@@ -191,7 +192,7 @@ async def create_ebay_listing(listing: Listing, user: str):
         "marketplaceId": "EBAY_US",
         "format": "FIXED_PRICE",
         "availableQuantity": 1,
-        "categoryId": "177009",  # Plants & Seeds category
+        "categoryId": "11450",  # Home & Garden category
         "listingDescription": listing.description,
         "listingDuration": "DAYS_7",
         "listingPolicies": {
