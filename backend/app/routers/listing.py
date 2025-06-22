@@ -561,8 +561,10 @@ async def get_or_create_merchant_location(token: str) -> str:
         print(f"[DEBUG] Trying location creation attempt {i+1} with data: {json.dumps(location_data, indent=2)}")
         
         try:
+            # Use the merchantLocationKey in the URL path
+            location_url = f"https://api.ebay.com/sell/inventory/v1/location/{location_data['merchantLocationKey']}"
             response = requests.post(
-                "https://api.ebay.com/sell/inventory/v1/location",
+                location_url,
                 json=location_data,
                 headers=headers,
                 timeout=30
@@ -573,7 +575,7 @@ async def get_or_create_merchant_location(token: str) -> str:
             
             if response.status_code == 201:
                 print(f"[DEBUG] Location created successfully on attempt {i+1}")
-                return "LOCATION_1"
+                return location_data['merchantLocationKey']
         except Exception as e:
             print(f"[DEBUG] Exception on location creation attempt {i+1}: {e}")
     
