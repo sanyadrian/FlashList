@@ -121,7 +121,7 @@ async def create_ebay_listing(listing: Listing, user: str):
             "aspects": {
                 "Brand": [listing.brand if listing.brand else "Generic"],
                 "Condition": ["New"],
-                "Country/Region of Manufacture": ["United States"]
+                "Country/Region of Manufacture": ["US"]
             }
         },
         "condition": "NEW",
@@ -212,7 +212,7 @@ async def create_ebay_listing(listing: Listing, user: str):
         "aspects": {
             "Brand": [listing.brand if listing.brand else "Generic"],
             "Condition": ["New"],
-            "Country/Region of Manufacture": ["United States"]
+            "Country/Region of Manufacture": ["US"]
         },
         "country": "US",
         "locale": "en-US"
