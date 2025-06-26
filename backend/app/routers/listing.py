@@ -55,11 +55,11 @@ class EbayNotificationRequest(BaseModel):
     metadata: Dict[str, Any]
     notification: EbayNotification
 
-def get_ebay_category_id(category: str, title: str = "", description: str = "", user: str = "") -> str:
+async def get_ebay_category_id(category: str, title: str = "", description: str = "", user: str = "") -> str:
     """
     Get the best eBay category ID for an item using the category manager.
     """
-    return category_manager.get_best_category_for_item(title, description, user)
+    return await category_manager.get_best_category_for_item(title, description, user)
 
 async def create_ebay_listing(listing: Listing, user: str):
     """
@@ -313,7 +313,7 @@ async def create_ebay_listing(listing: Listing, user: str):
         "marketplaceId": "EBAY_US",
         "format": "FIXED_PRICE",
         "availableQuantity": 1,
-        "categoryId": get_ebay_category_id(listing.category, listing.title, listing.description, user),
+        "categoryId": await get_ebay_category_id(listing.category, listing.title, listing.description, user),
         "itemTitle": listing.title,
         "listingDescription": listing.description,
         "listingDuration": "DAYS_7",

@@ -12,14 +12,14 @@ class EbayCategoryManager:
         self.last_update = None
         self.cache_duration = timedelta(days=7)  # Cache for 7 days
         
-    def get_leaf_categories(self, user: str) -> Dict[str, str]:
+    async def get_leaf_categories(self, user: str) -> Dict[str, str]:
         """
         Get leaf categories from eBay API or cache.
         Returns a dict mapping category names to category IDs.
         """
         # Check if we need to refresh the cache
         if self._should_refresh_cache():
-            self._fetch_categories_from_ebay(user)
+            await self._fetch_categories_from_ebay(user)
         
         return self.categories_cache
     
@@ -33,12 +33,12 @@ class EbayCategoryManager:
         
         return datetime.now() - self.last_update > self.cache_duration
     
-    def _fetch_categories_from_ebay(self, user: str):
+    async def _fetch_categories_from_ebay(self, user: str):
         """Fetch categories from eBay API and cache them."""
         print("[DEBUG] Fetching categories from eBay API...")
         
         # Get eBay token
-        token = get_ebay_token(user)
+        token = await get_ebay_token(user)
         if not token:
             print("[DEBUG] No eBay token available, using fallback categories")
             self._load_fallback_categories()
@@ -93,13 +93,13 @@ class EbayCategoryManager:
         
         # Add some specific plant-related categories that should be leaf categories
         plant_categories = {
-            "Plants & Seedlings": "159912",
-            "Garden Plants": "159913", 
-            "Indoor Plants": "159914",
-            "Outdoor Plants": "159915",
-            "Flowers": "159916",
-            "Succulents": "159917",
-            "Herbs": "159918",
+            "Plants & Seedlings": "220",  # Use Toys & Hobbies as it's more likely to be a leaf category
+            "Garden Plants": "220", 
+            "Indoor Plants": "220",
+            "Outdoor Plants": "220",
+            "Flowers": "220",
+            "Succulents": "220",
+            "Herbs": "220",
         }
         
         categories.update(known_leaf_categories)
@@ -123,13 +123,14 @@ class EbayCategoryManager:
             "Automotive Parts & Accessories": "6000",
             "Art": "550",
             "Musical Instruments & Gear": "176985",
-            "Plants & Seedlings": "159912",
-            "Garden Plants": "159913",
-            "Indoor Plants": "159914",
-            "Outdoor Plants": "159915",
-            "Flowers": "159916",
-            "Succulents": "159917",
-            "Herbs": "159918",
+            # Use Toys & Hobbies for plant-related items since it's more likely to be a leaf category
+            "Plants & Seedlings": "220",
+            "Garden Plants": "220",
+            "Indoor Plants": "220",
+            "Outdoor Plants": "220",
+            "Flowers": "220",
+            "Succulents": "220",
+            "Herbs": "220",
         }
         
         self.categories_cache = fallback_categories
@@ -165,7 +166,7 @@ class EbayCategoryManager:
             self.categories_cache = {}
             self.last_update = None
     
-    def get_best_category_for_item(self, item_title: str, item_description: str = "", user: str = "") -> str:
+    async def get_best_category_for_item(self, item_title: str, item_description: str = "", user: str = "") -> str:
         """
         Find the best category for an item based on its title and description.
         Returns a category ID.
@@ -174,7 +175,7 @@ class EbayCategoryManager:
         if not self.categories_cache:
             self._load_categories_from_file()
             if not self.categories_cache:
-                self.get_leaf_categories(user)
+                await self.get_leaf_categories(user)
         
         # Simple keyword matching
         text = f"{item_title} {item_description}".lower()
