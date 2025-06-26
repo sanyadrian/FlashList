@@ -213,6 +213,68 @@ async def create_ebay_listing(listing: Listing, user: str):
         response = requests.put(update_url, json=update_location_data, headers=headers)
         print(f"[DEBUG] Location update response status: {response.status_code}")
         print(f"[DEBUG] Location update response: {response.text}")
+        
+        # If location update fails, we need to handle this properly
+        if response.status_code not in (200, 201, 204):
+            print("[DEBUG] Location update failed, trying alternative approach...")
+            
+            # Try to get the current location details first
+            try:
+                get_location_url = f"https://api.ebay.com/sell/inventory/v1/location/{merchant_location}"
+                get_response = requests.get(get_location_url, headers=headers, timeout=30)
+                print(f"[DEBUG] Get location response status: {get_response.status_code}")
+                print(f"[DEBUG] Get location response: {get_response.text}")
+                
+                if get_response.status_code == 200:
+                    current_location = get_response.json()
+                    print(f"[DEBUG] Current location data: {json.dumps(current_location, indent=2)}")
+                    
+                    # Check if it already has a postal code
+                    address = current_location.get("location", {}).get("address", {})
+                    if address.get("postalCode"):
+                        print(f"[DEBUG] Location already has postal code: {address.get('postalCode')}")
+                    else:
+                        # Try a different approach - create a new location with a different key
+                        print("[DEBUG] Creating new location with postal code...")
+                        new_location_data = {
+                            "location": {
+                                "address": {
+                                    "country": "US",
+                                    "city": "New York",
+                                    "postalCode": "10001"
+                                }
+                            },
+                            "locationTypes": ["WAREHOUSE"],
+                            "merchantLocationKey": "LOCATION_2",
+                            "merchantLocationStatus": "ENABLED"
+                        }
+                        
+                        new_location_url = "https://api.ebay.com/sell/inventory/v1/location/LOCATION_2"
+                        new_response = requests.post(new_location_url, json=new_location_data, headers=headers, timeout=30)
+                        print(f"[DEBUG] New location creation response status: {new_response.status_code}")
+                        print(f"[DEBUG] New location creation response: {new_response.text}")
+                        
+                        if new_response.status_code in (200, 201, 204):
+                            print("[DEBUG] New location created successfully")
+                            merchant_location = "LOCATION_2"
+                        else:
+                            # If we can't create a new location, we need to fail
+                            raise HTTPException(
+                                status_code=400,
+                                detail="Unable to update or create eBay location with valid postal code. Please visit your eBay Seller Hub to create a location with a valid postal code first."
+                            )
+                else:
+                    # If we can't get location details, we need to fail
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Unable to retrieve eBay location details. Please visit your eBay Seller Hub to create a location with a valid postal code first."
+                    )
+            except Exception as e:
+                print(f"[DEBUG] Exception during location handling: {e}")
+                raise HTTPException(
+                    status_code=400,
+                    detail="Unable to configure eBay location properly. Please visit your eBay Seller Hub to create a location with a valid postal code first."
+                )
 
     # Create offer
     offer = {
