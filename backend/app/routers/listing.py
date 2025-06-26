@@ -60,10 +60,10 @@ def get_ebay_category_id(category: str) -> str:
     Returns a valid eBay leaf category ID based on the listing category.
     """
     category_mapping = {
-        "Plants": "159912",  # Plants, Seeds & Bulbs > Plants & Seedlings > Perennials
-        "Flowers": "159912",  # Plants, Seeds & Bulbs > Plants & Seedlings > Perennials
-        "Garden": "159912",   # Plants, Seeds & Bulbs > Plants & Seedlings > Perennials
-        "Home": "11450",      # Home & Garden (fallback)
+        "Plants": "11450",    # Home & Garden (more general, should work)
+        "Flowers": "11450",   # Home & Garden (more general, should work)
+        "Garden": "11450",    # Home & Garden (more general, should work)
+        "Home": "11450",      # Home & Garden
         "Electronics": "293", # Electronics & Accessories
         "Clothing": "11450",  # Home & Garden (fallback)
         "Books": "267",       # Books & Magazines
@@ -78,7 +78,7 @@ def get_ebay_category_id(category: str) -> str:
         "Tools": "631",       # Business & Industrial > Manufacturing & Metalworking > Welding & Soldering Equipment
         "Furniture": "11700", # Home & Garden > Furniture
         "Kitchen": "20667",   # Home & Garden > Kitchen, Dining & Bar
-        "Outdoor": "159912",  # Plants, Seeds & Bulbs (fallback for outdoor items)
+        "Outdoor": "11450",   # Home & Garden (fallback for outdoor items)
     }
     
     # Try to find an exact match first
@@ -90,8 +90,8 @@ def get_ebay_category_id(category: str) -> str:
         if key.lower() in category.lower() or category.lower() in key.lower():
             return value
     
-    # Default fallback
-    return "159912"  # Plants, Seeds & Bulbs > Plants & Seedlings > Perennials
+    # Default fallback - use Home & Garden as it's more general and should work
+    return "11450"  # Home & Garden
 
 async def create_ebay_listing(listing: Listing, user: str):
     """
@@ -273,7 +273,6 @@ async def create_ebay_listing(listing: Listing, user: str):
                     if address.get("postalCode"):
                         print(f"[DEBUG] Location already has postal code: {address.get('postalCode')}")
                     else:
-                        # Try a different approach - create a new location with a different key
                         print("[DEBUG] Creating new location with postal code...")
                         
                         # Check if LOCATION_2 already exists
