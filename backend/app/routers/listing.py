@@ -20,6 +20,7 @@ import hashlib
 import requests
 from app.routers.ebay_oauth import get_ebay_token
 from app.models.ebay_oauth_db import EbayOAuth
+from app.utils.ebay_categories import category_manager
 
 load_dotenv()
 
@@ -54,44 +55,11 @@ class EbayNotificationRequest(BaseModel):
     metadata: Dict[str, Any]
     notification: EbayNotification
 
-def get_ebay_category_id(category: str) -> str:
+def get_ebay_category_id(category: str, title: str = "", description: str = "", user: str = "") -> str:
     """
-    Map our categories to eBay leaf category IDs.
-    Returns a valid eBay leaf category ID based on the listing category.
+    Get the best eBay category ID for an item using the category manager.
     """
-    category_mapping = {
-        "Plants": "1",         # Collectibles (very general, should work)
-        "Flowers": "1",        # Collectibles (very general, should work)
-        "Garden": "1",         # Collectibles (very general, should work)
-        "Home": "1",           # Collectibles (very general, should work)
-        "Electronics": "293",  # Electronics & Accessories
-        "Clothing": "1",       # Collectibles (fallback)
-        "Books": "267",        # Books & Magazines
-        "Sports": "888",       # Sporting Goods
-        "Toys": "220",         # Toys & Hobbies
-        "Automotive": "6000",  # Automotive Parts & Accessories
-        "Health": "180959",    # Health & Beauty
-        "Jewelry": "281",      # Jewelry & Watches
-        "Collectibles": "1",   # Collectibles
-        "Art": "550",          # Art
-        "Music": "176985",     # Musical Instruments & Gear
-        "Tools": "631",        # Business & Industrial > Manufacturing & Metalworking > Welding & Soldering Equipment
-        "Furniture": "11700",  # Home & Garden > Furniture
-        "Kitchen": "20667",    # Home & Garden > Kitchen, Dining & Bar
-        "Outdoor": "1",        # Collectibles (fallback for outdoor items)
-    }
-    
-    # Try to find an exact match first
-    if category in category_mapping:
-        return category_mapping[category]
-    
-    # Try to find a partial match
-    for key, value in category_mapping.items():
-        if key.lower() in category.lower() or category.lower() in key.lower():
-            return value
-    
-    # Default fallback - use Collectibles as it's very general and should work
-    return "1"  # Collectibles
+    return category_manager.get_best_category_for_item(title, description, user)
 
 async def create_ebay_listing(listing: Listing, user: str):
     """
@@ -345,7 +313,7 @@ async def create_ebay_listing(listing: Listing, user: str):
         "marketplaceId": "EBAY_US",
         "format": "FIXED_PRICE",
         "availableQuantity": 1,
-        "categoryId": get_ebay_category_id(listing.category),
+        "categoryId": get_ebay_category_id(listing.category, listing.title, listing.description, user),
         "itemTitle": listing.title,
         "listingDescription": listing.description,
         "listingDuration": "DAYS_7",
