@@ -275,6 +275,31 @@ async def create_ebay_listing(listing: Listing, user: str):
                     else:
                         # Try a different approach - create a new location with a different key
                         print("[DEBUG] Creating new location with postal code...")
+                        
+                        # Check if LOCATION_2 already exists
+                        existing_locations = []
+                        try:
+                            get_all_response = requests.get("https://api.ebay.com/sell/inventory/v1/location", headers=headers, timeout=30)
+                            if get_all_response.status_code == 200:
+                                existing_locations = get_all_response.json().get("locations", [])
+                        except:
+                            pass
+                        
+                        # Find an available location key
+                        used_keys = {loc["merchantLocationKey"] for loc in existing_locations}
+                        new_location_key = None
+                        for i in range(2, 10):  # Try LOCATION_2 through LOCATION_9
+                            candidate_key = f"LOCATION_{i}"
+                            if candidate_key not in used_keys:
+                                new_location_key = candidate_key
+                                break
+                        
+                        if not new_location_key:
+                            raise HTTPException(
+                                status_code=400,
+                                detail="Too many eBay locations exist. Please delete some locations in your eBay Seller Hub first."
+                            )
+                        
                         new_location_data = {
                             "location": {
                                 "address": {
@@ -284,18 +309,18 @@ async def create_ebay_listing(listing: Listing, user: str):
                                 }
                             },
                             "locationTypes": ["WAREHOUSE"],
-                            "merchantLocationKey": "LOCATION_2",
+                            "merchantLocationKey": new_location_key,
                             "merchantLocationStatus": "ENABLED"
                         }
                         
-                        new_location_url = "https://api.ebay.com/sell/inventory/v1/location/LOCATION_2"
+                        new_location_url = f"https://api.ebay.com/sell/inventory/v1/location/{new_location_key}"
                         new_response = requests.post(new_location_url, json=new_location_data, headers=headers, timeout=30)
                         print(f"[DEBUG] New location creation response status: {new_response.status_code}")
                         print(f"[DEBUG] New location creation response: {new_response.text}")
                         
                         if new_response.status_code in (200, 201, 204):
-                            print("[DEBUG] New location created successfully")
-                            merchant_location = "LOCATION_2"
+                            print(f"[DEBUG] New location created successfully: {new_location_key}")
+                            merchant_location = new_location_key
                         else:
                             # If we can't create a new location, we need to fail
                             raise HTTPException(
@@ -655,8 +680,17 @@ async def get_or_create_merchant_location(token: str) -> str:
             locations = response.json().get("locations", [])
             print(f"[DEBUG] Found {len(locations)} existing locations")
             if locations:
+                # Look for a location that already has a postal code
+                for location in locations:
+                    address = location.get("location", {}).get("address", {})
+                    if address.get("postalCode"):
+                        location_key = location["merchantLocationKey"]
+                        print(f"[DEBUG] Using existing location with postal code: {location_key}")
+                        return location_key
+                
+                # If no location has postal code, use the first one and try to update it
                 location_key = locations[0]["merchantLocationKey"]
-                print(f"[DEBUG] Using existing location: {location_key}")
+                print(f"[DEBUG] Using existing location without postal code: {location_key}")
                 return location_key
     except Exception as e:
         print(f"[DEBUG] Exception fetching locations: {e}")
