@@ -54,6 +54,45 @@ class EbayNotificationRequest(BaseModel):
     metadata: Dict[str, Any]
     notification: EbayNotification
 
+def get_ebay_category_id(category: str) -> str:
+    """
+    Map our categories to eBay leaf category IDs.
+    Returns a valid eBay leaf category ID based on the listing category.
+    """
+    category_mapping = {
+        "Plants": "159912",  # Plants, Seeds & Bulbs > Plants & Seedlings > Perennials
+        "Flowers": "159912",  # Plants, Seeds & Bulbs > Plants & Seedlings > Perennials
+        "Garden": "159912",   # Plants, Seeds & Bulbs > Plants & Seedlings > Perennials
+        "Home": "11450",      # Home & Garden (fallback)
+        "Electronics": "293", # Electronics & Accessories
+        "Clothing": "11450",  # Home & Garden (fallback)
+        "Books": "267",       # Books & Magazines
+        "Sports": "888",      # Sporting Goods
+        "Toys": "220",        # Toys & Hobbies
+        "Automotive": "6000", # Automotive Parts & Accessories
+        "Health": "180959",   # Health & Beauty
+        "Jewelry": "281",     # Jewelry & Watches
+        "Collectibles": "1",  # Collectibles
+        "Art": "550",         # Art
+        "Music": "176985",    # Musical Instruments & Gear
+        "Tools": "631",       # Business & Industrial > Manufacturing & Metalworking > Welding & Soldering Equipment
+        "Furniture": "11700", # Home & Garden > Furniture
+        "Kitchen": "20667",   # Home & Garden > Kitchen, Dining & Bar
+        "Outdoor": "159912",  # Plants, Seeds & Bulbs (fallback for outdoor items)
+    }
+    
+    # Try to find an exact match first
+    if category in category_mapping:
+        return category_mapping[category]
+    
+    # Try to find a partial match
+    for key, value in category_mapping.items():
+        if key.lower() in category.lower() or category.lower() in key.lower():
+            return value
+    
+    # Default fallback
+    return "159912"  # Plants, Seeds & Bulbs > Plants & Seedlings > Perennials
+
 async def create_ebay_listing(listing: Listing, user: str):
     """
     Create a new listing in both our database and eBay.
@@ -282,7 +321,7 @@ async def create_ebay_listing(listing: Listing, user: str):
         "marketplaceId": "EBAY_US",
         "format": "FIXED_PRICE",
         "availableQuantity": 1,
-        "categoryId": "11450",  # Home & Garden category
+        "categoryId": get_ebay_category_id(listing.category),
         "itemTitle": listing.title,
         "listingDescription": listing.description,
         "listingDuration": "DAYS_7",
