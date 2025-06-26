@@ -333,6 +333,12 @@ async def create_ebay_listing(listing: Listing, user: str):
         "merchantLocationKey": merchant_location
     }
     
+    # Add images to the offer
+    if listing.image_filenames and len(listing.image_filenames) > 0:
+        image_urls = [f"https://{BUCKET_NAME}.s3.{REGION}.amazonaws.com/{filename}" for filename in listing.image_filenames]
+        offer["images"] = image_urls
+        print(f"[DEBUG] Added {len(image_urls)} images to offer: {image_urls}")
+    
     print(f"[DEBUG] Using merchant location: {merchant_location}")
 
     # Create offer
