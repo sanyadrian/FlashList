@@ -60,25 +60,25 @@ def get_ebay_category_id(category: str) -> str:
     Returns a valid eBay leaf category ID based on the listing category.
     """
     category_mapping = {
-        "Plants": "11450",    # Home & Garden (more general, should work)
-        "Flowers": "11450",   # Home & Garden (more general, should work)
-        "Garden": "11450",    # Home & Garden (more general, should work)
-        "Home": "11450",      # Home & Garden
-        "Electronics": "293", # Electronics & Accessories
-        "Clothing": "11450",  # Home & Garden (fallback)
-        "Books": "267",       # Books & Magazines
-        "Sports": "888",      # Sporting Goods
-        "Toys": "220",        # Toys & Hobbies
-        "Automotive": "6000", # Automotive Parts & Accessories
-        "Health": "180959",   # Health & Beauty
-        "Jewelry": "281",     # Jewelry & Watches
-        "Collectibles": "1",  # Collectibles
-        "Art": "550",         # Art
-        "Music": "176985",    # Musical Instruments & Gear
-        "Tools": "631",       # Business & Industrial > Manufacturing & Metalworking > Welding & Soldering Equipment
-        "Furniture": "11700", # Home & Garden > Furniture
-        "Kitchen": "20667",   # Home & Garden > Kitchen, Dining & Bar
-        "Outdoor": "11450",   # Home & Garden (fallback for outdoor items)
+        "Plants": "1",         # Collectibles (very general, should work)
+        "Flowers": "1",        # Collectibles (very general, should work)
+        "Garden": "1",         # Collectibles (very general, should work)
+        "Home": "1",           # Collectibles (very general, should work)
+        "Electronics": "293",  # Electronics & Accessories
+        "Clothing": "1",       # Collectibles (fallback)
+        "Books": "267",        # Books & Magazines
+        "Sports": "888",       # Sporting Goods
+        "Toys": "220",         # Toys & Hobbies
+        "Automotive": "6000",  # Automotive Parts & Accessories
+        "Health": "180959",    # Health & Beauty
+        "Jewelry": "281",      # Jewelry & Watches
+        "Collectibles": "1",   # Collectibles
+        "Art": "550",          # Art
+        "Music": "176985",     # Musical Instruments & Gear
+        "Tools": "631",        # Business & Industrial > Manufacturing & Metalworking > Welding & Soldering Equipment
+        "Furniture": "11700",  # Home & Garden > Furniture
+        "Kitchen": "20667",    # Home & Garden > Kitchen, Dining & Bar
+        "Outdoor": "1",        # Collectibles (fallback for outdoor items)
     }
     
     # Try to find an exact match first
@@ -90,8 +90,8 @@ def get_ebay_category_id(category: str) -> str:
         if key.lower() in category.lower() or category.lower() in key.lower():
             return value
     
-    # Default fallback - use Home & Garden as it's more general and should work
-    return "11450"  # Home & Garden
+    # Default fallback - use Collectibles as it's very general and should work
+    return "1"  # Collectibles
 
 async def create_ebay_listing(listing: Listing, user: str):
     """
