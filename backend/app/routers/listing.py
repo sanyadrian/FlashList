@@ -153,6 +153,12 @@ async def create_ebay_listing(listing: Listing, user: str):
         },
         "country": "US"
     }
+    
+    # Add images to the inventory item
+    if listing.image_filenames and len(listing.image_filenames) > 0:
+        image_urls = [f"https://{BUCKET_NAME}.s3.{REGION}.amazonaws.com/{filename}" for filename in listing.image_filenames]
+        inventory_item["product"]["imageUrls"] = image_urls
+        print(f"[DEBUG] Added {len(image_urls)} images to inventory item: {image_urls}")
 
     # Create inventory item using PUT to the correct URL with SKU
     inventory_url = f"https://api.ebay.com/sell/inventory/v1/inventory_item/{sku}"
@@ -332,12 +338,6 @@ async def create_ebay_listing(listing: Listing, user: str):
         "includeCatalogProductDetails": True,
         "merchantLocationKey": merchant_location
     }
-    
-    # Add images to the offer
-    if listing.image_filenames and len(listing.image_filenames) > 0:
-        image_urls = [f"https://{BUCKET_NAME}.s3.{REGION}.amazonaws.com/{filename}" for filename in listing.image_filenames]
-        offer["images"] = image_urls
-        print(f"[DEBUG] Added {len(image_urls)} images to offer: {image_urls}")
     
     print(f"[DEBUG] Using merchant location: {merchant_location}")
 
