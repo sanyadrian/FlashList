@@ -376,11 +376,16 @@ async def create_ebay_listing(listing: Listing, user: str):
 
     # Publish offer
     publish_url = f"https://api.ebay.com/sell/inventory/v1/offer/{offer_id}/publish"
+    print(f"[DEBUG] Publishing offer {offer_id} to eBay...")
+    print(f"[DEBUG] Publish URL: {publish_url}")
     response = requests.post(publish_url, headers=headers)
+    print(f"[DEBUG] Publish response status: {response.status_code}")
+    print(f"[DEBUG] Publish response: {response.text}")
     if response.status_code != 200:
         print(f"[DEBUG] Failed to publish offer: {response.text}")
         raise HTTPException(status_code=400, detail=f"Failed to publish eBay offer: {response.text}")
 
+    print(f"[DEBUG] Successfully published offer {offer_id} to eBay")
     return offer_id
 
 @router.post("/create")
