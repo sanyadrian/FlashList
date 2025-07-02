@@ -65,6 +65,9 @@ async def create_ebay_listing(listing: Listing, user: str):
     """
     Create a new listing in both our database and eBay.
     """
+    # Set retry configuration
+    max_retries = 3
+    
     # Get eBay token
     token = await get_ebay_token(user)
     if not token:

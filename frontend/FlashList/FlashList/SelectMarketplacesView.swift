@@ -196,5 +196,17 @@ struct SelectMarketplacesView: View {
 }
 
 #Preview {
-    SelectMarketplacesView(draft: ListingDraft(title: "", description: "", category: "", tags: "", price: "", photoFilenames: [], photos: []))
+    SelectMarketplacesView(draft: ListingDraft(
+        title: "",
+        description: "",
+        category: "",
+        tags: "",
+        price: "",
+        condition: "New",
+        location_city: "",
+        location_state: "",
+        location_postal_code: "",
+        photoFilenames: [],
+        photos: []
+    ))
 } 
