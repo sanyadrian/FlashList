@@ -170,27 +170,28 @@ class EbayCategoryManager:
 
     def _load_fallback_categories(self):
         """Load fallback categories when API calls fail."""
-        # Try some category IDs that might be leaf categories
-        # Based on the documentation, we need to find actual leaf categories
+        # Use better fallback categories - these should be actual leaf categories
+        # Note: These are examples and may need to be updated with verified category IDs
         fallback_categories = {
-            # Use the known leaf category from the documentation
-            "Toys & Hobbies": "165362",  # Collectibles > Comics > Bronze Age (1970-83) > Sports
-            "Books & Magazines": "165362",
-            "Jewelry & Watches": "165362", 
-            "Electronics & Accessories": "165362",
-            "Health & Beauty": "165362",
-            "Sporting Goods": "165362",
-            "Automotive Parts & Accessories": "165362",
-            "Art": "165362",
-            "Musical Instruments & Gear": "165362",
-            # Use the known leaf category for all plant-related items
-            "Plants & Seedlings": "165362",  # Collectibles > Comics > Bronze Age (1970-83) > Sports
-            "Garden Plants": "165362",
-            "Indoor Plants": "165362",
-            "Outdoor Plants": "165362",
-            "Flowers": "165362",
-            "Succulents": "165362",
-            "Herbs": "165362",
+            # Gardening and Plants (these need to be verified with actual eBay category IDs)
+            "Plants & Seedlings": "159912",  # Home & Garden > Plants & Seeds > Plants
+            "Garden Plants": "159912",
+            "Indoor Plants": "159912",
+            "Outdoor Plants": "159912",
+            "Flowers": "159912",
+            "Succulents": "159912",
+            "Herbs": "159912",
+            
+            # Other categories (using more appropriate IDs)
+            "Toys & Hobbies": "220",
+            "Books & Magazines": "267",
+            "Jewelry & Watches": "281",
+            "Electronics & Accessories": "293",
+            "Health & Beauty": "180959",
+            "Sporting Goods": "888",
+            "Automotive Parts & Accessories": "6000",
+            "Art": "550",
+            "Musical Instruments & Gear": "176985",
         }
         
         self.categories_cache = fallback_categories
@@ -226,18 +227,103 @@ class EbayCategoryManager:
             self.categories_cache = {}
             self.last_update = None
     
+    async def get_category_from_browse_api(self, item_title: str, item_description: str = "", user: str = "") -> Optional[str]:
+        """
+        Use eBay's Browse API to find the most relevant category for an item.
+        Returns a category ID or None if not found.
+        """
+        token = await get_ebay_token(user)
+        if not token:
+            print("[DEBUG] No eBay token available for Browse API search")
+            return None
+        
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+            "X-EBAY-C-MARKETPLACE-ID": "EBAY_US"
+        }
+        
+        # Create search query from title and description
+        search_query = item_title
+        if item_description:
+            # Add key words from description (limit to avoid overly long queries)
+            desc_words = item_description.split()[:5]  # Take first 5 words
+            search_query += " " + " ".join(desc_words)
+        
+        # Clean up the search query
+        search_query = search_query.strip()
+        if len(search_query) > 100:  # Limit query length
+            search_query = search_query[:100]
+        
+        print(f"[DEBUG] Searching eBay Browse API for: '{search_query}'")
+        
+        try:
+            # Search for similar items using eBay Browse API
+            search_url = "https://api.ebay.com/buy/browse/v1/item_summary/search"
+            params = {
+                "q": search_query,
+                "limit": 10,  # Get top 10 results
+                "filter": "conditions:{NEW|USED_EXCELLENT|USED_VERY_GOOD|USED_GOOD|USED_ACCEPTABLE}"  # Include various conditions
+            }
+            
+            response = requests.get(search_url, headers=headers, params=params, timeout=30)
+            print(f"[DEBUG] Browse API response status: {response.status_code}")
+            
+            if response.status_code == 200:
+                data = response.json()
+                items = data.get("itemSummaries", [])
+                
+                if items:
+                    # Extract category IDs from search results
+                    category_counts = {}
+                    for item in items:
+                        category_id = item.get("itemLocation", {}).get("postalCode")  # This might not be the right field
+                        # Let me check the actual structure
+                        print(f"[DEBUG] Item structure: {json.dumps(item, indent=2)[:500]}...")
+                        
+                        # Look for category information in the item
+                        if "category" in item:
+                            category_id = item["category"].get("categoryId")
+                            if category_id:
+                                category_counts[category_id] = category_counts.get(category_id, 0) + 1
+                    
+                    if category_counts:
+                        # Return the most common category
+                        most_common_category = max(category_counts, key=category_counts.get)
+                        print(f"[DEBUG] Found category {most_common_category} from Browse API (appeared {category_counts[most_common_category]} times)")
+                        return most_common_category
+                    else:
+                        print("[DEBUG] No category information found in search results")
+                else:
+                    print("[DEBUG] No search results found")
+            else:
+                print(f"[DEBUG] Browse API error: {response.text}")
+                
+        except Exception as e:
+            print(f"[DEBUG] Exception in Browse API search: {e}")
+        
+        return None
+
     async def get_best_category_for_item(self, item_title: str, item_description: str = "", user: str = "") -> str:
         """
-        Find the best category for an item based on its title and description.
+        Find the best category for an item using Browse API first, then fallback to keyword matching.
         Returns a category ID.
         """
+        # First, try to get category from eBay Browse API
+        browse_category = await self.get_category_from_browse_api(item_title, item_description, user)
+        if browse_category:
+            print(f"[DEBUG] Using Browse API category: {browse_category} for item: {item_title}")
+            return browse_category
+        
+        print("[DEBUG] Browse API failed, falling back to keyword matching")
+        
         # Load categories if not loaded
         if not self.categories_cache:
             self._load_categories_from_file()
             if not self.categories_cache:
                 await self.get_leaf_categories(user)
         
-        # Simple keyword matching
+        # Simple keyword matching as fallback
         text = f"{item_title} {item_description}".lower()
         
         # Priority order for matching
