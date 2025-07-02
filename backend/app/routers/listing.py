@@ -127,13 +127,13 @@ async def create_ebay_listing(listing: Listing, user: str):
             "mpn": sku,  # Manufacturer Part Number
             "aspects": {
                 "Brand": [listing.brand if listing.brand else "Generic"],
-                "Condition": ["New"],
+                "Condition": [listing.condition if listing.condition else "New"],
                 "Country/Region of Manufacture": ["US"]
             },
             "country": "US",
             "title": listing.title
         },
-        "condition": "NEW",
+        "condition": listing.condition if listing.condition else "NEW",
         "packageWeightAndSize": {
             "dimensions": {
                 "height": 1,
@@ -160,158 +160,21 @@ async def create_ebay_listing(listing: Listing, user: str):
         inventory_item["product"]["imageUrls"] = image_urls
         print(f"[DEBUG] Added {len(image_urls)} images to inventory item: {image_urls}")
 
-    # Create inventory item using PUT to the correct URL with SKU
-    inventory_url = f"https://api.ebay.com/sell/inventory/v1/inventory_item/{sku}"
-    print(f"[DEBUG] Creating inventory item with data: {json.dumps(inventory_item, indent=2)}")
-    print(f"[DEBUG] Headers: {json.dumps(headers, indent=2)}")
-    
-    # Add retry logic for transient errors
-    max_retries = 3
-    for attempt in range(max_retries):
-        try:
-            response = requests.put(inventory_url, json=inventory_item, headers=headers, timeout=30)
-            if response.status_code in (200, 201, 204):  # 204 means success with no content
-                break
-            elif response.status_code == 500 and attempt < max_retries - 1:
-                print(f"[DEBUG] eBay API returned 500, retrying... (attempt {attempt + 1}/{max_retries})")
-                import time
-                time.sleep(2 ** attempt)  # Exponential backoff
-                continue
-            else:
-                break
-        except requests.exceptions.RequestException as e:
-            if attempt < max_retries - 1:
-                print(f"[DEBUG] Request failed, retrying... (attempt {attempt + 1}/{max_retries}): {e}")
-                import time
-                time.sleep(2 ** attempt)
-                continue
-            else:
-                raise HTTPException(status_code=500, detail=f"Failed to connect to eBay API: {str(e)}")
-    
-    if response.status_code not in (200, 201, 204):
-        print(f"[DEBUG] Failed to create inventory item: {response.text}")
-        print(f"[DEBUG] Response headers: {dict(response.headers)}")
-        print(f"[DEBUG] Response status: {response.status_code}")
-        raise HTTPException(status_code=400, detail=f"Failed to create eBay inventory item: {response.text}")
-
-    # eBay does not return inventoryItemId, use sku
-    inventory_item_id = sku
-
-    # Get or create merchant location
-    merchant_location = await get_or_create_merchant_location(token)
+    # --- Location override logic ---
+    # If the listing provides a location, use it for merchant location creation
+    # Otherwise, fallback to default logic
+    merchant_location = None
+    if listing.location_city and listing.location_postal_code:
+        # Try to find or create a merchant location with these details
+        merchant_location = await get_or_create_merchant_location_with_details(token, listing.location_city, listing.location_postal_code, listing.location_state)
+    else:
+        merchant_location = await get_or_create_merchant_location(token)
 
     if not merchant_location:
         raise HTTPException(
             status_code=400,
             detail="eBay merchant location required. Please visit your eBay Seller Hub to create a location first, then try again. See /listing/ebay/setup-instructions for detailed steps."
         )
-
-    # Update existing location to include postal code if it's the default location
-    if merchant_location == "LOCATION_1":
-        print("[DEBUG] Updating existing location with postal code...")
-        update_location_data = {
-            "location": {
-                "address": {
-                    "country": "US",
-                    "city": "New York",
-                    "postalCode": "10001"
-                }
-            },
-            "locationTypes": ["WAREHOUSE"],
-            "merchantLocationKey": "LOCATION_1",
-            "merchantLocationStatus": "ENABLED"
-        }
-        
-        update_url = f"https://api.ebay.com/sell/inventory/v1/location/{merchant_location}"
-        response = requests.put(update_url, json=update_location_data, headers=headers)
-        print(f"[DEBUG] Location update response status: {response.status_code}")
-        print(f"[DEBUG] Location update response: {response.text}")
-        
-        # If location update fails, we need to handle this properly
-        if response.status_code not in (200, 201, 204):
-            print("[DEBUG] Location update failed, trying alternative approach...")
-            
-            # Try to get the current location details first
-            try:
-                get_location_url = f"https://api.ebay.com/sell/inventory/v1/location/{merchant_location}"
-                get_response = requests.get(get_location_url, headers=headers, timeout=30)
-                print(f"[DEBUG] Get location response status: {get_response.status_code}")
-                print(f"[DEBUG] Get location response: {get_response.text}")
-                
-                if get_response.status_code == 200:
-                    current_location = get_response.json()
-                    print(f"[DEBUG] Current location data: {json.dumps(current_location, indent=2)}")
-                    
-                    # Check if it already has a postal code
-                    address = current_location.get("location", {}).get("address", {})
-                    if address.get("postalCode"):
-                        print(f"[DEBUG] Location already has postal code: {address.get('postalCode')}")
-                    else:
-                        print("[DEBUG] Creating new location with postal code...")
-                        
-                        # Check if LOCATION_2 already exists
-                        existing_locations = []
-                        try:
-                            get_all_response = requests.get("https://api.ebay.com/sell/inventory/v1/location", headers=headers, timeout=30)
-                            if get_all_response.status_code == 200:
-                                existing_locations = get_all_response.json().get("locations", [])
-                        except:
-                            pass
-                        
-                        # Find an available location key
-                        used_keys = {loc["merchantLocationKey"] for loc in existing_locations}
-                        new_location_key = None
-                        for i in range(2, 10):  # Try LOCATION_2 through LOCATION_9
-                            candidate_key = f"LOCATION_{i}"
-                            if candidate_key not in used_keys:
-                                new_location_key = candidate_key
-                                break
-                        
-                        if not new_location_key:
-                            raise HTTPException(
-                                status_code=400,
-                                detail="Too many eBay locations exist. Please delete some locations in your eBay Seller Hub first."
-                            )
-                        
-                        new_location_data = {
-                            "location": {
-                                "address": {
-                                    "country": "US",
-                                    "city": "New York",
-                                    "postalCode": "10001"
-                                }
-                            },
-                            "locationTypes": ["WAREHOUSE"],
-                            "merchantLocationKey": new_location_key,
-                            "merchantLocationStatus": "ENABLED"
-                        }
-                        
-                        new_location_url = f"https://api.ebay.com/sell/inventory/v1/location/{new_location_key}"
-                        new_response = requests.post(new_location_url, json=new_location_data, headers=headers, timeout=30)
-                        print(f"[DEBUG] New location creation response status: {new_response.status_code}")
-                        print(f"[DEBUG] New location creation response: {new_response.text}")
-                        
-                        if new_response.status_code in (200, 201, 204):
-                            print(f"[DEBUG] New location created successfully: {new_location_key}")
-                            merchant_location = new_location_key
-                        else:
-                            # If we can't create a new location, we need to fail
-                            raise HTTPException(
-                                status_code=400,
-                                detail="Unable to update or create eBay location with valid postal code. Please visit your eBay Seller Hub to create a location with a valid postal code first."
-                            )
-                else:
-                    # If we can't get location details, we need to fail
-                    raise HTTPException(
-                        status_code=400,
-                        detail="Unable to retrieve eBay location details. Please visit your eBay Seller Hub to create a location with a valid postal code first."
-                    )
-            except Exception as e:
-                print(f"[DEBUG] Exception during location handling: {e}")
-                raise HTTPException(
-                    status_code=400,
-                    detail="Unable to configure eBay location properly. Please visit your eBay Seller Hub to create a location with a valid postal code first."
-                )
 
     # Create offer
     offer = {
@@ -632,6 +495,86 @@ async def handle_ebay_challenge(request: Request, challenge_code: str = Query(..
         content={"challengeResponse": challenge_response},
         headers={"Content-Type": "application/json"}
     )
+
+async def get_or_create_merchant_location_with_details(token: str, city: str, postal_code: str, state: str = None) -> str:
+    """
+    Get or create a merchant location with specific details.
+    Returns the location key or None if creation fails.
+    """
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
+    
+    # First, try to get existing locations
+    try:
+        response = requests.get(
+            "https://api.ebay.com/sell/inventory/v1/location",
+            headers=headers,
+            timeout=30
+        )
+        
+        print(f"[DEBUG] Location fetch response status: {response.status_code}")
+        print(f"[DEBUG] Location fetch response: {response.text}")
+        
+        if response.status_code == 200:
+            locations = response.json().get("locations", [])
+            print(f"[DEBUG] Found {len(locations)} existing locations")
+            
+            # Look for a location that matches our details
+            for location in locations:
+                address = location.get("location", {}).get("address", {})
+                if (address.get("city") == city and 
+                    address.get("postalCode") == postal_code and
+                    (not state or address.get("stateOrProvince") == state)):
+                    location_key = location["merchantLocationKey"]
+                    print(f"[DEBUG] Found matching location: {location_key}")
+                    return location_key
+    except Exception as e:
+        print(f"[DEBUG] Exception fetching locations: {e}")
+    
+    # Create a new location with the provided details
+    print(f"[DEBUG] Creating new location with details: {city}, {state}, {postal_code}")
+    
+    location_data = {
+        "location": {
+            "address": {
+                "country": "US",
+                "city": city,
+                "postalCode": postal_code
+            }
+        },
+        "locationTypes": [
+            "WAREHOUSE"
+        ],
+        "merchantLocationKey": f"LOCATION_{city}_{postal_code}",
+        "merchantLocationStatus": "ENABLED"
+    }
+    
+    # Add state if provided
+    if state:
+        location_data["location"]["address"]["stateOrProvince"] = state
+    
+    try:
+        location_url = f"https://api.ebay.com/sell/inventory/v1/location/{location_data['merchantLocationKey']}"
+        response = requests.post(
+            location_url,
+            json=location_data,
+            headers=headers,
+            timeout=30
+        )
+        
+        print(f"[DEBUG] Location creation response status: {response.status_code}")
+        print(f"[DEBUG] Location creation response: {response.text}")
+        
+        if response.status_code in (200, 201, 204):
+            print(f"[DEBUG] Location created successfully")
+            return location_data['merchantLocationKey']
+    except Exception as e:
+        print(f"[DEBUG] Exception creating location: {e}")
+    
+    print("[DEBUG] Location creation failed")
+    return None
 
 async def get_or_create_merchant_location(token: str) -> str:
     """

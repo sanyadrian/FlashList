@@ -157,7 +157,11 @@ struct SelectMarketplacesView: View {
             tags: draft.tags.split(separator: ",").map { String($0.trimmingCharacters(in: .whitespaces)) },
             price: priceDouble,
             image_filenames: draft.photoFilenames,
-            marketplaces: selectedMarketplaces
+            marketplaces: selectedMarketplaces,
+            condition: draft.condition,
+            location_city: draft.location_city.isEmpty ? nil : draft.location_city,
+            location_state: draft.location_state.isEmpty ? nil : draft.location_state,
+            location_postal_code: draft.location_postal_code.isEmpty ? nil : draft.location_postal_code
         )
         guard let url = URL(string: Config.apiURL("/listing/create")) else { return }
         var request = URLRequest(url: url)

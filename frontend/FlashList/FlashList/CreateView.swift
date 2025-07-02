@@ -3,6 +3,28 @@ import UIKit
 import AVFoundation
 import PhotosUI
 
+// Condition options for eBay listings
+let conditionOptions = [
+    "New",
+    "New with defects",
+    "New with box",
+    "New without box",
+    "Used - Excellent",
+    "Used - Very Good",
+    "Used - Good",
+    "Used - Acceptable",
+    "For parts or not working"
+]
+
+// US States for location selection
+let usStates = [
+    "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
+    "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
+    "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",
+    "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC",
+    "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"
+]
+
 // Listing model
 struct Listing: Codable {
     let title: String
@@ -13,6 +35,10 @@ struct Listing: Codable {
     var image_filenames: [String]?
     var marketplaces: [String]?
     var brand: String?
+    var condition: String?
+    var location_city: String?
+    var location_state: String?
+    var location_postal_code: String?
 }
 
 // Helper struct for draft listing (not yet sent to backend)
@@ -22,6 +48,10 @@ struct ListingDraft {
     var category: String
     var tags: String
     var price: String
+    var condition: String
+    var location_city: String
+    var location_state: String
+    var location_postal_code: String
     var photoFilenames: [String]
     var photos: [UIImage]
 }
@@ -113,6 +143,10 @@ struct CreateView: View {
     @State private var category: String = ""
     @State private var tags: String = ""
     @State private var price: String = ""
+    @State private var condition: String = "New"
+    @State private var location_city: String = ""
+    @State private var location_state: String = ""
+    @State private var location_postal_code: String = ""
     @State private var showListingForm = false
     @State private var isUploading = false
     @State private var showSuccessAlert = false
@@ -386,6 +420,52 @@ struct CreateView: View {
                     TextField("Enter price", text: $price)
                         .keyboardType(.decimalPad)
                 }
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Condition")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                    Picker("Condition", selection: $condition) {
+                        ForEach(conditionOptions, id: \.self) { condition in
+                            Text(condition).tag(condition)
+                        }
+                    }
+                    .pickerStyle(MenuPickerStyle())
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            
+            Section(header: Text("LOCATION")) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("City")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                    TextField("Enter city", text: $location_city)
+                }
+                
+                HStack {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("State")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                        Picker("State", selection: $location_state) {
+                            Text("Select State").tag("")
+                            ForEach(usStates, id: \.self) { state in
+                                Text(state).tag(state)
+                            }
+                        }
+                        .pickerStyle(MenuPickerStyle())
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Postal Code")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                        TextField("Enter ZIP", text: $location_postal_code)
+                            .keyboardType(.numberPad)
+                    }
+                }
             }
             
             Section {
@@ -397,6 +477,10 @@ struct CreateView: View {
                         category: category,
                         tags: tags,
                         price: price,
+                        condition: condition,
+                        location_city: location_city,
+                        location_state: location_state,
+                        location_postal_code: location_postal_code,
                         photoFilenames: photoFilenames,
                         photos: photos
                     )
@@ -428,7 +512,11 @@ struct CreateView: View {
             category: category,
             tags: tags.split(separator: ",").map { String($0.trimmingCharacters(in: .whitespaces)) },
             price: priceDouble,
-            image_filenames: photoFilenames
+            image_filenames: photoFilenames,
+            condition: condition,
+            location_city: location_city.isEmpty ? nil : location_city,
+            location_state: location_state.isEmpty ? nil : location_state,
+            location_postal_code: location_postal_code.isEmpty ? nil : location_postal_code
         )
         guard let url = URL(string: Config.apiURL("/listing/create")) else { return }
         var request = URLRequest(url: url)
@@ -467,6 +555,10 @@ struct CreateView: View {
         category = ""
         tags = ""
         price = ""
+        condition = "New"
+        location_city = ""
+        location_state = ""
+        location_postal_code = ""
         photos = []
         photoFilenames = []
         showListingForm = false
