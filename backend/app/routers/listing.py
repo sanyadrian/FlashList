@@ -207,6 +207,20 @@ async def create_ebay_listing(listing: Listing, user: str):
     
     print(f"[DEBUG] Using merchant location: {merchant_location}")
 
+    # First, create the inventory item
+    inventory_url = f"https://api.ebay.com/sell/inventory/v1/inventory_item/{sku}"
+    print(f"[DEBUG] Creating inventory item with data: {json.dumps(inventory_item, indent=2)}")
+    
+    inventory_response = requests.put(inventory_url, json=inventory_item, headers=headers, timeout=30)
+    print(f"[DEBUG] Inventory item creation response status: {inventory_response.status_code}")
+    print(f"[DEBUG] Inventory item creation response: {inventory_response.text}")
+    
+    if inventory_response.status_code not in (200, 201, 204):
+        print(f"[DEBUG] Failed to create inventory item: {inventory_response.text}")
+        raise HTTPException(status_code=400, detail=f"Failed to create eBay inventory item: {inventory_response.text}")
+    
+    print(f"[DEBUG] Successfully created inventory item with SKU: {sku}")
+
     # Create offer
     offer_url = "https://api.ebay.com/sell/inventory/v1/offer"
     print(f"[DEBUG] Creating offer with data: {json.dumps(offer, indent=2)}")
