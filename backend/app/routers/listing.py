@@ -130,13 +130,12 @@ async def create_ebay_listing(listing: Listing, user: str):
             "mpn": sku,  # Manufacturer Part Number
             "aspects": {
                 "Brand": [listing.brand if listing.brand else "Generic"],
-                "Condition": [listing.condition if listing.condition else "New"],
                 "Country/Region of Manufacture": ["US"]
             },
             "country": "US",
             "title": listing.title
         },
-        "condition": listing.condition if listing.condition else "NEW",
+        "condition": "NEW",  # eBay inventory items use fixed condition, offer will override this
         "packageWeightAndSize": {
             "dimensions": {
                 "height": 1,
@@ -202,12 +201,12 @@ async def create_ebay_listing(listing: Listing, user: str):
         },
         "quantityLimitPerBuyer": 1,
         "includeCatalogProductDetails": True,
-        "merchantLocationKey": merchant_location
+        "merchantLocationKey": merchant_location,
+        "condition": listing.condition if listing.condition else "NEW"
     }
     
     print(f"[DEBUG] Using merchant location: {merchant_location}")
 
-    # First, create the inventory item
     inventory_url = f"https://api.ebay.com/sell/inventory/v1/inventory_item/{sku}"
     print(f"[DEBUG] Creating inventory item with data: {json.dumps(inventory_item, indent=2)}")
     
